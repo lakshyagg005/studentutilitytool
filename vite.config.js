@@ -8,7 +8,6 @@ export default defineConfig({
     sitemap({
       hostname: "https://tools.filtero.in",
       dynamicRoutes: [
-        "/",
         "/attendance-calculator",
         "/cgpa-calculator",
         "/percentage-calculator",

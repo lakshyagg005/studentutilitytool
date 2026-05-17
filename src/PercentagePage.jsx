@@ -97,7 +97,7 @@ export default function PercentagePage() {
   const relatedTools = TOOLS.filter(t => RELATED_IDS.includes(t.id));
 
   return (
-    <ToolPageLayout tool={tool}>
+    <ToolPageLayout tool={{ ...tool, faqs: [] }}>
 
       {/* Calculator */}
       <PercentageCalc />

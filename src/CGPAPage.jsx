@@ -146,7 +146,7 @@ export default function CGPAPage() {
   const relatedTools = TOOLS.filter(t => RELATED_IDS.includes(t.id));
 
   return (
-    <ToolPageLayout tool={tool}>
+    <ToolPageLayout tool={{ ...tool, faqs: [] }}>
 
       {/* ── Calculator — completely untouched ── */}
       <CGPACalc />
@@ -258,7 +258,7 @@ export default function CGPAPage() {
               borderBottom: "1px solid var(--border)",
             }}
           >
-            {["Subject", "Grade", "Points", "Credits"].map(h => (
+            {["Subject", "Grade", "Points", "Credits", "Points × Credits"].slice(0, 4).map(h => (
               <span
                 key={h}
                 style={{

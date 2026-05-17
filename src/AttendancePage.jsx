@@ -92,7 +92,7 @@ export default function AttendancePage() {
   const relatedTools = TOOLS.filter(t => RELATED_IDS.includes(t.id));
 
   return (
-    <ToolPageLayout tool={tool}>
+    <ToolPageLayout tool={{ ...tool, faqs: [] }}>
 
       {/* ── Calculator — completely untouched ── */}
       <AttendanceCalc />

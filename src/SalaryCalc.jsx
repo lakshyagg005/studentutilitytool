@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
-import CopyBtn from "../components/CopyBtn";
-import { fmt } from "../utils/helpers";
+import CopyBtn from "./CopyBtn";
+import { fmt } from "./helpers";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 // jsPDF import guarded for safe compilation
 let jsPDF;

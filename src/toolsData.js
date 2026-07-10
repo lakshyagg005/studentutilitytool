@@ -211,11 +211,11 @@ export const TOOLS = [
     shortName: "Salary",
     desc: "Take-home pay",
     tag: "💰 Finance",
-    subtitle: "Estimate your take-home salary after taxes (New Tax Regime, FY 2024-25).",
+    subtitle: "Estimate your take-home salary after taxes (New Tax Regime, FY 2025-26).",
     seo: {
       title: "Salary Calculator India – In-Hand Salary After Tax | Filtero",
       description:
-        "Calculate your monthly in-hand salary after income tax (New Tax Regime FY 2024-25), PF deduction, and cess. Free Indian salary take-home calculator.",
+        "Calculate your monthly in-hand salary after income tax (New Tax Regime FY 2025-26), PF deduction, and cess. Free Indian salary take-home calculator.",
       canonical: "https://filtero.app/salary-calculator",
     },
     faqs: [
@@ -224,7 +224,7 @@ export const TOOLS = [
         a: "In-hand salary = CTC − Income Tax − PF Contribution − other deductions. Tax is calculated on taxable income using the applicable slab rates.",
       },
       {
-        q: "What is the New Tax Regime for FY 2024-25?",
+        q: "What is the New Tax Regime for FY 2025-26?",
         a: "New regime slabs: 0% up to ₹3L, 5% (₹3L–6L), 10% (₹6L–9L), 15% (₹9L–12L), 20% (₹12L–15L), 30% above ₹15L. Plus 4% health & education cess.",
       },
       {

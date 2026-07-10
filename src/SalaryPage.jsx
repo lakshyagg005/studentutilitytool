@@ -1,315 +1,1041 @@
-import { Link } from "react-router-dom";
-import { useSEO } from "./useSEO";
-import { TOOLS } from "./toolsData";
-import ToolPageLayout from "./ToolPageLayout";
-import SalaryCalc from "./SalaryCalc";
+import { useState, useMemo } from "react";
+import CopyBtn from "../components/CopyBtn";
+import { fmt } from "../utils/helpers";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
 
-const tool = TOOLS.find(t => t.id === "salary");
+let jsPDF;
+try { jsPDF = require("jspdf").jsPDF; } catch (e) { jsPDF = null; }
 
-const RELATED_IDS = ["attendance", "cgpa", "percentage", "internal", "emi", "loan", "board", "age"];
-
-const HOW_STEPS = [
-  { n: "1", title: "Enter your annual CTC", body: "Type your Cost to Company in rupees as stated in your offer letter or appointment letter. CTC is the total amount your employer spends on you annually — it includes your gross salary plus employer contributions like PF and gratuity." },
-  { n: "2", title: "Read your monthly gross salary", body: "The calculator instantly shows your monthly gross — CTC divided by 12. This is what you earn before deductions. Note that this is not what gets credited to your bank account." },
-  { n: "3", title: "Check income tax and PF deductions", body: "The calculator applies New Tax Regime slabs (FY 2024-25) and caps PF at ₹21,600 per year. These are the two largest deductions for most salaried employees." },
-  { n: "4", title: "See your monthly in-hand salary", body: "Your take-home salary appears after subtracting income tax and PF. This is the amount credited to your bank account each month." },
-  { n: "5", title: "Compare annual in-hand vs CTC", body: "The difference between your annual CTC and annual in-hand is your total yearly deductions. This gap helps you budget accurately and evaluate whether a job offer meets your actual financial needs." },
+// ─── Tax Constants (FY 2025-26 / Budget 2025) ─────────────────────────────────
+const NEW_REGIME_SLABS = [
+  { min: 0,       max: 400000,   rate: 0    },
+  { min: 400000,  max: 800000,   rate: 0.05 },
+  { min: 800000,  max: 1200000,  rate: 0.10 },
+  { min: 1200000, max: 1600000,  rate: 0.15 },
+  { min: 1600000, max: 2000000,  rate: 0.20 },
+  { min: 2000000, max: 2400000,  rate: 0.25 },
+  { min: 2400000, max: Infinity, rate: 0.30 },
 ];
-
-const SALARY_COMPONENTS = [
-  { component: "Basic Salary",         meaning: "Core fixed pay",                        pct: "35–50% of CTC",  example: "₹35,000" },
-  { component: "HRA",                  meaning: "House Rent Allowance",                  pct: "40–50% of Basic",example: "₹17,500" },
-  { component: "Special Allowance",    meaning: "Flexible pay component",                pct: "10–30% of CTC",  example: "₹20,000" },
-  { component: "Performance Bonus",    meaning: "Variable pay based on target",          pct: "5–20% of CTC",   example: "₹60,000" },
-  { component: "Employee PF",          meaning: "Provident Fund (employee share)",       pct: "12% of Basic",   example: "₹4,200" },
-  { component: "Employer PF",          meaning: "PF contribution from employer",         pct: "12% of Basic",   example: "₹4,200" },
-  { component: "Income Tax (TDS)",     meaning: "Tax Deducted at Source monthly",        pct: "Slab-based",     example: "₹8,333" },
-  { component: "Professional Tax",     meaning: "State-levied tax on employment",        pct: "Fixed (up to ₹2,500/yr)", example: "₹200" },
-  { component: "Net / In-Hand Salary", meaning: "Amount credited to your bank account", pct: "CTC minus all deductions", example: "₹62,267" },
+const OLD_REGIME_SLABS = [
+  { min: 0,       max: 250000,   rate: 0    },
+  { min: 250000,  max: 500000,   rate: 0.05 },
+  { min: 500000,  max: 1000000,  rate: 0.20 },
+  { min: 1000000, max: Infinity, rate: 0.30 },
 ];
+const NEW_REGIME_STANDARD_DEDUCTION = 75000;
+const OLD_REGIME_STANDARD_DEDUCTION = 50000;
+// Section 87A rebate thresholds
+const NEW_REBATE_LIMIT = 1200000;  // ₹12L taxable → zero tax (FY 2025-26)
+const OLD_REBATE_LIMIT = 500000;   // ₹5L taxable → max ₹12,500 rebate
+const OLD_REBATE_MAX   = 12500;
+const CESS_RATE        = 0.04;
+// EPF
+const EPF_WAGE_CEILING_MONTHLY = 15000; // statutory EPF wage ceiling
+const EPF_RATE                  = 0.12;
+// Gratuity: Payment of Gratuity Act formula = (Basic / 26) × 15 per year ≈ 4.81% of annual basic
+const GRATUITY_RATE = 15 / (26 * 12); // monthly accrual as fraction of monthly basic
 
-const TAX_REGIME_TABLE = [
-  { feature: "Standard Deduction",   old: "₹50,000",           newR: "₹75,000 (FY 2024-25)" },
-  { feature: "80C Deduction",        old: "Up to ₹1.5L",       newR: "Not available" },
-  { feature: "HRA Exemption",        old: "Available",          newR: "Not available" },
-  { feature: "LTA Exemption",        old: "Available",          newR: "Not available" },
-  { feature: "Home Loan Interest",   old: "Up to ₹2L",         newR: "Not available" },
-  { feature: "NPS (80CCD(2))",       old: "Available",          newR: "Available" },
-  { feature: "Tax on ₹10L income",   old: "~₹1,12,500",        newR: "~₹60,000" },
-  { feature: "Tax on ₹15L income",   old: "~₹2,62,500",        newR: "~₹1,50,000" },
-  { feature: "Best suited for",      old: "High deductions (>₹3.5L)", newR: "Simple structure / fewer deductions" },
-];
+// ─── Professional Tax (monthly gross salary thresholds → monthly tax) ─────────
+// Slabs are approximate; exact figures vary by state gazette notification
+const PROFESSIONAL_TAX_STATES = {
+  Karnataka:         [{ max: 15000, tax: 0 }, { max: Infinity, tax: 200 }],
+  Maharashtra:       [{ max: 7500, tax: 0 }, { max: 10000, tax: 175 }, { max: Infinity, tax: 200 }],
+  "West Bengal":     [{ max: 10000, tax: 0 }, { max: 15000, tax: 110 }, { max: 25000, tax: 130 }, { max: 40000, tax: 150 }, { max: Infinity, tax: 200 }],
+  "Tamil Nadu":      [{ max: 21000, tax: 0 }, { max: Infinity, tax: 208 }],
+  Telangana:         [{ max: 15000, tax: 0 }, { max: Infinity, tax: 200 }],
+  "Andhra Pradesh":  [{ max: 15000, tax: 0 }, { max: Infinity, tax: 200 }],
+  Kerala:            [{ max: 2000, tax: 0 }, { max: 3000, tax: 20 }, { max: 5000, tax: 30 }, { max: 8000, tax: 50 }, { max: 10000, tax: 75 }, { max: 12000, tax: 100 }, { max: 16000, tax: 125 }, { max: 20000, tax: 160 }, { max: Infinity, tax: 200 }],
+  Gujarat:           [{ max: 5999, tax: 0 }, { max: 8999, tax: 80 }, { max: 11999, tax: 150 }, { max: Infinity, tax: 200 }],
+  "Madhya Pradesh":  [{ max: 18750, tax: 0 }, { max: Infinity, tax: 208 }],
+  Odisha:            [{ max: 13304, tax: 0 }, { max: 25000, tax: 125 }, { max: 40000, tax: 175 }, { max: Infinity, tax: 200 }],
+  Assam:             [{ max: 10000, tax: 0 }, { max: 14999, tax: 80 }, { max: Infinity, tax: 208 }],
+  Delhi:             [{ max: Infinity, tax: 0 }],
+  Rajasthan:         [{ max: Infinity, tax: 0 }],
+  "Uttar Pradesh":   [{ max: Infinity, tax: 0 }],
+  Haryana:           [{ max: Infinity, tax: 0 }],
+  Punjab:            [{ max: Infinity, tax: 0 }],
+  Bihar:             [{ max: Infinity, tax: 0 }],
+  Other:             [{ max: Infinity, tax: 0 }],
+};
 
-const FAQS = [
-  { q: "What is CTC and how is it different from in-hand salary?", a: "CTC (Cost to Company) is the total annual expenditure your employer makes on your employment. It includes your gross salary, employer's PF contribution, gratuity, health insurance premium, and other benefits. In-hand or take-home salary is what you actually receive after subtracting income tax (TDS), your own PF contribution (12% of basic), and professional tax. For a ₹12 LPA CTC, the in-hand salary is typically ₹75,000–₹85,000 per month depending on tax liability and structure." },
-  { q: "How is in-hand salary calculated from CTC?", a: "In-hand salary = Annual CTC − Income Tax (TDS) − Employee PF − Professional Tax (if applicable) − other deductions, all divided by 12 for monthly. For example, on a ₹12 LPA CTC with New Tax Regime, income tax is approximately ₹90,000 + 4% cess = ₹93,600, PF is ₹21,600 (capped), making the annual in-hand approximately ₹10,14,800, or ₹84,567 per month." },
-  { q: "What is the New Tax Regime for FY 2024-25?", a: "The New Tax Regime (FY 2024-25) offers lower tax rates but removes most deductions. Slabs: 0% up to ₹3L, 5% for ₹3L–6L, 10% for ₹6L–9L, 15% for ₹9L–12L, 20% for ₹12L–15L, and 30% above ₹15L. A standard deduction of ₹75,000 is available. A 4% health and education cess applies on the total tax. Income up to ₹7L is effectively tax-free under the rebate under Section 87A." },
-  { q: "Should I choose Old or New Tax Regime?", a: "The New Regime is better when your total exemptions and deductions under the Old Regime are below approximately ₹3.5 lakh. If you have a home loan, pay high rent (and claim HRA), invest heavily under 80C, or have significant LTA claims, the Old Regime often results in lower tax. For most freshers with CTC below ₹8–10 LPA and minimal deductions, the New Regime offers lower effective tax." },
-  { q: "What is PF deduction and how is it calculated?", a: "Employee PF = 12% of Basic Salary, subject to a wage ceiling. For employees with basic salary above ₹15,000, the mandatory employer PF contribution is calculated on ₹15,000 (₹1,800/month or ₹21,600/year). Your PF contribution of the same amount is deducted from your salary. The combined PF (employee + employer) accumulates in your EPF account and earns tax-free interest (currently 8.25% per year)." },
-  { q: "Is professional tax part of every salary?", a: "Professional tax is a state-level tax levied on salaried employees in some Indian states — including Maharashtra, Karnataka, West Bengal, Tamil Nadu, Telangana, and Andhra Pradesh. The maximum is ₹2,500 per year (₹200/month in most states). States like Delhi, Rajasthan, Haryana, and Uttar Pradesh do not levy professional tax. Your employer deducts it monthly and remits it to the state government." },
-  { q: "What is the basic salary and why does it matter?", a: "Basic salary is the fixed core component of your CTC. It typically ranges from 35–50% of your CTC. Basic salary matters because PF, gratuity, and HRA are all calculated as a percentage of basic. A higher basic means higher PF deduction (less take-home) but also faster accumulation of retirement corpus and higher gratuity on exit. Companies sometimes keep basic low to reduce statutory obligations." },
-  { q: "How does a performance bonus affect monthly salary?", a: "Annual performance bonuses are part of your CTC but are not paid monthly in most companies. They are typically disbursed quarterly or annually based on performance rating and company results. The calculator assumes CTC divided by 12 for monthly gross. If your bonus is variable, your actual monthly salary before tax can be lower than this figure in non-bonus months." },
-  { q: "What is gratuity and is it part of my in-hand salary?", a: "Gratuity is a statutory retirement benefit payable after 5 years of continuous employment. It is part of your CTC but is not paid monthly — it is a lump sum paid when you leave the organisation after completing 5 years. The gratuity amount = (15 × Last Basic Salary × Years of Service) / 26. Since you do not receive it monthly, it reduces your effective monthly in-hand even though it appears in the CTC." },
-  { q: "How can I increase my take-home salary legally?", a: "Several legal methods exist: Switch to New Tax Regime if your deductions are low (saves tax for most employees below ₹15 LPA). Invest in NPS (Tier 1) for an additional deduction under Section 80CCD(2) up to 10% of basic — available even under New Regime. Claim meal vouchers and LTA if offered. Optimise your salary structure with HR — a higher special allowance and lower basic can sometimes increase take-home while reducing PF." },
-];
+const COLORS = {
+  netPay:     "#4caf50",
+  tax:        "#f44336",
+  empPF:      "#2196f3",
+  employerPF: "#03a9f4",
+  gratuity:   "#ff9800",
+  profTax:    "#9c27b0",
+};
 
-const sectionStyle = { background: "var(--bg-surface)", border: "1px solid var(--border)", borderRadius: "var(--radius-xl)", padding: "2rem 2.5rem", marginTop: "1.25rem" };
-const h2Style = { fontFamily: "var(--font-display)", fontSize: "1.2rem", fontWeight: 700, color: "var(--text-primary)", marginBottom: "1rem", letterSpacing: "-0.01em" };
-const bodyStyle = { color: "var(--text-secondary)", fontSize: "0.875rem", lineHeight: 1.75, margin: 0 };
-const labelStyle = { fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: "var(--accent)", margin: "0 0 0.5rem" };
-const codeBlockStyle = { display: "block", background: "var(--bg-input)", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", padding: "0.75rem 1rem", fontSize: "0.875rem", color: "var(--text-primary)", fontFamily: "monospace", marginBottom: "0.5rem", wordBreak: "break-word" };
-const inlineCode = { background: "var(--bg-input)", padding: "1px 6px", borderRadius: 4, fontSize: "0.82rem", fontFamily: "monospace" };
-const thStyle = { padding: "0.6rem 1rem", fontSize: "0.72rem", fontWeight: 700, color: "var(--text-muted)", letterSpacing: "0.04em", textTransform: "uppercase" };
+// ─── Tax Engine ───────────────────────────────────────────────────────────────
+function calcSlabTax(income, slabs) {
+  let tax = 0;
+  for (const s of slabs) {
+    if (income > s.min) tax += (Math.min(income, s.max) - s.min) * s.rate;
+  }
+  return tax;
+}
 
-export default function SalaryPage() {
-  useSEO(tool.seo);
-  const relatedTools = TOOLS.filter(t => RELATED_IDS.includes(t.id));
+/**
+ * New Regime income tax (FY 2025-26).
+ * @param {number} incomeAfterPT  Total income minus Professional Tax (Section 16(iii))
+ */
+export function calculateNewTax(incomeAfterPT) {
+  const taxable = Math.max(0, incomeAfterPT - NEW_REGIME_STANDARD_DEDUCTION);
+  let tax = calcSlabTax(taxable, NEW_REGIME_SLABS);
+
+  if (taxable <= NEW_REBATE_LIMIT) {
+    // Section 87A: full rebate — zero tax for taxable income ≤ ₹12,00,000
+    tax = 0;
+  } else {
+    // Marginal relief: tax cannot exceed income above the rebate threshold
+    tax = Math.min(tax, taxable - NEW_REBATE_LIMIT);
+  }
+
+  return Math.round(tax * (1 + CESS_RATE));
+}
+
+/**
+ * Old Regime income tax.
+ * @param {number} incomeAfterAllDeductions  Income after HRA, 80C etc. (before std deduction)
+ */
+export function calculateOldTax(incomeAfterAllDeductions) {
+  const taxable = Math.max(0, incomeAfterAllDeductions - OLD_REGIME_STANDARD_DEDUCTION);
+  let tax = calcSlabTax(taxable, OLD_REGIME_SLABS);
+
+  // Section 87A: rebate up to ₹12,500 for taxable income ≤ ₹5L
+  if (taxable <= OLD_REBATE_LIMIT) tax = Math.max(0, tax - Math.min(tax, OLD_REBATE_MAX));
+
+  return Math.round(tax * (1 + CESS_RATE));
+}
+
+/**
+ * Marginal tax rate via ₹1 lakh delta on actual tax engine.
+ * Accounts for standard deduction, rebate, marginal relief and cess.
+ * @param {"new"|"old"} regime
+ * @param {number} taxFunctionInput  Same value passed to calculateNewTax / calculateOldTax
+ * @returns {number}  Rate as decimal (e.g. 0.312 for 31.2%)
+ */
+function computeMarginalRate(regime, taxFunctionInput) {
+  const DELTA = 100000;
+  const t1 = regime === "new" ? calculateNewTax(taxFunctionInput)         : calculateOldTax(taxFunctionInput);
+  const t2 = regime === "new" ? calculateNewTax(taxFunctionInput + DELTA) : calculateOldTax(taxFunctionInput + DELTA);
+  return Math.max(0, (t2 - t1) / DELTA);
+}
+
+/** Clamp to non-negative integer; returns 0 for invalid input. */
+function clampNonNegative(val) {
+  const n = Math.round(Number(val) || 0);
+  return Number.isFinite(n) ? Math.max(0, n) : 0;
+}
+
+/** Professional Tax for state given gross monthly salary. */
+function calculateProfessionalTax(state, grossMonthly) {
+  const slabs = PROFESSIONAL_TAX_STATES[state] ?? PROFESSIONAL_TAX_STATES["Other"];
+  for (const s of slabs) {
+    if (grossMonthly <= s.max) return s.tax;
+  }
+  return 0;
+}
+
+// ─── Core Payroll Engine ───────────────────────────────────────────────────────
+/**
+ * Calculate complete salary breakdown, tax and net in-hand.
+ *
+ * CTC model: Total CTC = Gross Fixed + Variable Pay + Joining + Retention + Employer PF + Est. Gratuity
+ * Net In-Hand = Total Employee Income - Income Tax - Employee PF - Professional Tax
+ *   (Employer PF and Gratuity are employer costs; employee does not receive them as monthly cash)
+ *
+ * Donut chart segments sum exactly to Total CTC:
+ *   Net In-Hand + Tax + Employee PF + Prof Tax + Employer PF + Gratuity = Total CTC
+ *
+ * @param {Object} p
+ * @param {number}  p.grossSalaryAnnual
+ * @param {number}  p.variablePayAnnual
+ * @param {number}  p.joiningBonusAnnual
+ * @param {number}  p.retentionBonusAnnual
+ * @param {number}  p.basicSalaryPercent   35–50
+ * @param {string}  p.profTaxState
+ * @param {"new"|"old"} p.regime
+ * @param {boolean} p.metro                true = Metro (50% HRA), false = Non-Metro (40% HRA)
+ * @param {number}  p.monthlyRentPaid      actual rent; 0 = assume full HRA exempt (old regime)
+ * @param {Object}  p.oldDedns             old regime deductions { d80C, d80D, homeLoanInterest, lta, nps80CCD }
+ */
+function calculateSalaryDetails({
+  grossSalaryAnnual,
+  variablePayAnnual,
+  joiningBonusAnnual,
+  retentionBonusAnnual,
+  basicSalaryPercent,
+  profTaxState,
+  regime,
+  metro        = true,
+  monthlyRentPaid = 0,
+  oldDedns     = {},
+}) {
+  // ── Salary structure ──────────────────────────────────────────────────────
+  const basicAnnual  = (grossSalaryAnnual * basicSalaryPercent) / 100;
+  const hraPct       = metro ? 0.50 : 0.40;
+  const hraAnnual    = basicAnnual * hraPct;
+  const specialAllowanceAnnual = Math.max(0, grossSalaryAnnual - basicAnnual - hraAnnual);
+
+  // ── EPF (statutory EPF wage ceiling: ₹15,000/month) ──────────────────────
+  const epfBase          = Math.min(basicAnnual / 12, EPF_WAGE_CEILING_MONTHLY) * 12;
+  const employerPFAnnual = Math.round(epfBase * EPF_RATE);
+  const employeePFAnnual = Math.round(epfBase * EPF_RATE);
+
+  // ── Gratuity (estimated annual accrual per Payment of Gratuity Act) ───────
+  const gratuityAnnual = Math.round((basicAnnual / 12) * GRATUITY_RATE * 12);
+
+  // ── Professional Tax (Section 16(iii) — deductible in BOTH regimes) ───────
+  const profTaxMonthly = calculateProfessionalTax(profTaxState, grossSalaryAnnual / 12);
+  const profTaxAnnual  = profTaxMonthly * 12;
+
+  // ── Income totals ─────────────────────────────────────────────────────────
+  const totalEmployeeIncome = grossSalaryAnnual + variablePayAnnual + joiningBonusAnnual + retentionBonusAnnual;
+  const totalCTC             = totalEmployeeIncome + employerPFAnnual + gratuityAnnual;
+
+  // ── Taxable income ────────────────────────────────────────────────────────
+  // PT is deductible under Section 16(iii) in both regimes
+  const incomeAfterPT = Math.max(0, totalEmployeeIncome - profTaxAnnual);
+
+  let taxFunctionInput;      // income passed to the tax engine (before standard deduction)
+  let taxableIncomeDisplay;  // for display: after all deductions incl. standard deduction
+
+  if (regime === "new") {
+    // New Regime: only Professional Tax is deductible beyond the standard deduction.
+    // Employee PF (80C) is NOT deductible; HRA exemption, 80D etc. are NOT available.
+    taxFunctionInput     = incomeAfterPT;
+    taxableIncomeDisplay = Math.max(0, taxFunctionInput - NEW_REGIME_STANDARD_DEDUCTION);
+  } else {
+    // Old Regime: PT + HRA exemption + 80C + 80D + Home Loan + LTA + NPS
+    const rentAnnual = clampNonNegative(monthlyRentPaid) * 12;
+
+    // Section 10(13A) HRA exemption: minimum of three limits
+    const limit1HRA   = hraAnnual;                                         // actual HRA received
+    const limit2Rent  = rentAnnual > 0
+      ? Math.max(0, rentAnnual - basicAnnual * 0.10)                      // rent paid − 10% of basic
+      : hraAnnual;                                                          // no rent entered: assume full HRA exempt
+    const limit3Basic = basicAnnual * hraPct;                              // metro/non-metro % of basic
+    const hraExempt   = Math.min(limit1HRA, limit2Rent, limit3Basic);
+
+    // Section 80C: employee EPF auto-included + user's additional, capped at ₹1.5L
+    const d80C    = clampNonNegative(oldDedns.d80C);
+    const total80C = Math.min(employeePFAnnual + d80C, 150000);
+
+    // Section 80D: health insurance premiums
+    const total80D = Math.min(clampNonNegative(oldDedns.d80D), 100000);
+
+    // Section 24(b): home loan interest on self-occupied property, cap ₹2L
+    const homeLoanDedn = Math.min(clampNonNegative(oldDedns.homeLoanInterest), 200000);
+
+    // LTA exemption
+    const ltaDedn = clampNonNegative(oldDedns.lta);
+
+    // Section 80CCD(1B): additional NPS (over 80C), cap ₹50K
+    const npsDedn = Math.min(clampNonNegative(oldDedns.nps80CCD), 50000);
+
+    const totalOldDeductions = hraExempt + total80C + total80D + homeLoanDedn + ltaDedn + npsDedn;
+    taxFunctionInput         = Math.max(0, incomeAfterPT - totalOldDeductions);
+    taxableIncomeDisplay     = Math.max(0, taxFunctionInput - OLD_REGIME_STANDARD_DEDUCTION);
+  }
+
+  const tax = regime === "new" ? calculateNewTax(taxFunctionInput) : calculateOldTax(taxFunctionInput);
+
+  // ── Derived metrics ───────────────────────────────────────────────────────
+  const effectiveTaxRate = totalEmployeeIncome > 0 ? tax / totalEmployeeIncome : 0;
+  const marginalTaxRate  = computeMarginalRate(regime, taxFunctionInput);
+
+  // Net in-hand: cash received by employee annually
+  // Employer PF and Gratuity are employer-side costs not received as monthly salary
+  const netInHandAnnual = totalEmployeeIncome - tax - employeePFAnnual - profTaxAnnual;
+
+  return {
+    basicAnnual, hraAnnual, specialAllowanceAnnual,
+    employerPFAnnual, employeePFAnnual, gratuityAnnual,
+    profTaxMonthly, profTaxAnnual,
+    variablePayAnnual, joiningBonusAnnual, retentionBonusAnnual,
+    grossSalaryAnnual, totalEmployeeIncome, totalCTC,
+    taxableIncome: taxableIncomeDisplay,
+    tax, effectiveTaxRate, marginalTaxRate,
+    netInHandAnnual,
+  };
+}
+
+function fmtPct(val) {
+  if (!Number.isFinite(val)) return "0.00%";
+  return (val * 100).toFixed(2) + "%";
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
+export default function SalaryCalc() {
+  // ── Existing input state (preserved) ──────────────────────────────────────
+  const [grossSalaryInput,    setGrossSalaryInput]    = useState("");
+  const [variablePayInput,    setVariablePayInput]    = useState("");
+  const [joiningBonusInput,   setJoiningBonusInput]   = useState("");
+  const [retentionBonusInput, setRetentionBonusInput] = useState("");
+  const [basicSalaryPercent,  setBasicSalaryPercent]  = useState(40);
+  const [regime,              setRegime]              = useState("new");
+  const [period,              setPeriod]              = useState("annual");
+  const [profTaxState,        setProfTaxState]        = useState("Karnataka");
+  const [reverseMode,         setReverseMode]         = useState(false);
+  const [reverseInput,        setReverseInput]        = useState("");
+  const [offerComparisonMode, setOfferComparisonMode] = useState(false);
+
+  // ── New state: HRA configuration, old regime deductions ───────────────────
+  const [metro,          setMetro]          = useState(true);
+  const [monthlyRentPaid, setMonthlyRentPaid] = useState("");
+  const [showOldDedns,   setShowOldDedns]   = useState(false);
+  const [oldDedns,       setOldDedns]       = useState({ d80C: 0, d80D: 0, homeLoanInterest: 0, lta: 0, nps80CCD: 0 });
+
+  // ── Offer comparison (updated with metro field) ────────────────────────────
+  const [offer1, setOffer1] = useState({ grossSalaryInput: "", variablePayInput: "", joiningBonusInput: "", retentionBonusInput: "", basicSalaryPercent: 40, regime: "new", profTaxState: "Karnataka", metro: true });
+  const [offer2, setOffer2] = useState({ grossSalaryInput: "", variablePayInput: "", joiningBonusInput: "", retentionBonusInput: "", basicSalaryPercent: 40, regime: "new", profTaxState: "Karnataka", metro: true });
+
+  function toAnnual(val)   { return period === "monthly" ? val * 12 : val; }
+  function fromAnnual(val) { return period === "monthly" ? val / 12 : val; }
+
+  const grossSalaryAnnual    = toAnnual(clampNonNegative(grossSalaryInput));
+  const variablePayAnnual    = toAnnual(clampNonNegative(variablePayInput));
+  const joiningBonusAnnual   = toAnnual(clampNonNegative(joiningBonusInput));
+  const retentionBonusAnnual = toAnnual(clampNonNegative(retentionBonusInput));
+
+  // ── Memoized calculations ──────────────────────────────────────────────────
+  const salaryDetails = useMemo(() => {
+    if (!grossSalaryAnnual && !variablePayAnnual && !joiningBonusAnnual && !retentionBonusAnnual) return null;
+    return calculateSalaryDetails({ grossSalaryAnnual, variablePayAnnual, joiningBonusAnnual, retentionBonusAnnual, basicSalaryPercent, profTaxState, regime, metro, monthlyRentPaid: clampNonNegative(monthlyRentPaid), oldDedns });
+  }, [grossSalaryAnnual, variablePayAnnual, joiningBonusAnnual, retentionBonusAnnual, basicSalaryPercent, profTaxState, regime, metro, monthlyRentPaid, oldDedns]);
+
+  const comparisonDetails = useMemo(() => {
+    if (!grossSalaryAnnual && !variablePayAnnual && !joiningBonusAnnual && !retentionBonusAnnual) return null;
+    const newD = calculateSalaryDetails({ grossSalaryAnnual, variablePayAnnual, joiningBonusAnnual, retentionBonusAnnual, basicSalaryPercent, profTaxState, regime: "new", metro, monthlyRentPaid: clampNonNegative(monthlyRentPaid), oldDedns });
+    const oldD = calculateSalaryDetails({ grossSalaryAnnual, variablePayAnnual, joiningBonusAnnual, retentionBonusAnnual, basicSalaryPercent, profTaxState, regime: "old", metro, monthlyRentPaid: clampNonNegative(monthlyRentPaid), oldDedns });
+    const taxDiff = oldD.tax - newD.tax;
+    return { newRegimeDetails: newD, oldRegimeDetails: oldD, taxDiff, savings: Math.abs(taxDiff) };
+  }, [grossSalaryAnnual, variablePayAnnual, joiningBonusAnnual, retentionBonusAnnual, basicSalaryPercent, profTaxState, metro, monthlyRentPaid, oldDedns]);
+
+  const reverseAnnualDesired = toAnnual(clampNonNegative(reverseInput));
+  const reverseResult = useMemo(() => {
+    if (!reverseMode || !reverseAnnualDesired) return null;
+    let lo = 0, hi = 1e8, best = null;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      const d = calculateSalaryDetails({ grossSalaryAnnual: mid, variablePayAnnual: 0, joiningBonusAnnual: 0, retentionBonusAnnual: 0, basicSalaryPercent, profTaxState, regime, metro, monthlyRentPaid: clampNonNegative(monthlyRentPaid), oldDedns });
+      if (d.netInHandAnnual >= reverseAnnualDesired) { hi = mid; best = d; } else lo = mid;
+    }
+    return best;
+  }, [reverseMode, reverseAnnualDesired, basicSalaryPercent, profTaxState, regime, metro, monthlyRentPaid, oldDedns]);
+
+  const offer1Details = useMemo(() => {
+    const g = toAnnual(clampNonNegative(offer1.grossSalaryInput)), v = toAnnual(clampNonNegative(offer1.variablePayInput));
+    const j = toAnnual(clampNonNegative(offer1.joiningBonusInput)), r = toAnnual(clampNonNegative(offer1.retentionBonusInput));
+    if (!g && !v && !j && !r) return null;
+    return calculateSalaryDetails({ grossSalaryAnnual: g, variablePayAnnual: v, joiningBonusAnnual: j, retentionBonusAnnual: r, basicSalaryPercent: offer1.basicSalaryPercent, profTaxState: offer1.profTaxState, regime: offer1.regime, metro: offer1.metro, monthlyRentPaid: 0, oldDedns: {} });
+  }, [offer1, period]);
+
+  const offer2Details = useMemo(() => {
+    const g = toAnnual(clampNonNegative(offer2.grossSalaryInput)), v = toAnnual(clampNonNegative(offer2.variablePayInput));
+    const j = toAnnual(clampNonNegative(offer2.joiningBonusInput)), r = toAnnual(clampNonNegative(offer2.retentionBonusInput));
+    if (!g && !v && !j && !r) return null;
+    return calculateSalaryDetails({ grossSalaryAnnual: g, variablePayAnnual: v, joiningBonusAnnual: j, retentionBonusAnnual: r, basicSalaryPercent: offer2.basicSalaryPercent, profTaxState: offer2.profTaxState, regime: offer2.regime, metro: offer2.metro, monthlyRentPaid: 0, oldDedns: {} });
+  }, [offer2, period]);
+
+  // ── Copy / Share ───────────────────────────────────────────────────────────
+  const activeDetails = reverseMode ? reverseResult : salaryDetails;
+  const copyText = activeDetails
+    ? `Regime: ${regime === "new" ? "New" : "Old"} | Net In-Hand: ${period === "monthly" ? `\u20B9${fmt(activeDetails.netInHandAnnual / 12)}/mo` : `\u20B9${fmt(activeDetails.netInHandAnnual)}/yr`} | Tax: \u20B9${fmt(activeDetails.tax)} | Employee PF: \u20B9${fmt(activeDetails.employeePFAnnual)} | Total CTC: \u20B9${fmt(activeDetails.totalCTC)}`
+    : "";
+
+  const handleShareResult = () => {
+    if (!activeDetails) return;
+    if (navigator.share) {
+      navigator.share({ title: "Salary Calculator Result", text: copyText }).catch(() => { navigator.clipboard.writeText(copyText); });
+    } else { navigator.clipboard.writeText(copyText); alert("Result copied to clipboard"); }
+  };
+
+  // ── PDF Export ─────────────────────────────────────────────────────────────
+  const handleDownloadPDF = () => {
+    if (!jsPDF || !salaryDetails) return;
+    const doc = new jsPDF();
+    const fv  = v => `\u20B9${fromAnnual(v).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`;
+    let y = 14;
+    const line = (lbl, val, indent = 0) => { doc.text(lbl, 14 + indent, y); doc.text(String(val), 195, y, { align: "right" }); y += 7; };
+    const sep  = () => { doc.setDrawColor(200); doc.line(14, y - 1, 196, y - 1); y += 2; };
+
+    doc.setFontSize(16); doc.setFont("helvetica", "bold"); doc.text("Salary Breakdown", 105, y, { align: "center" }); y += 10;
+    doc.setFontSize(9);  doc.setFont("helvetica", "normal");
+    doc.text(`Tax Regime: ${regime === "new" ? "New (FY 2025-26)" : "Old Regime"}  |  Period: ${period}  |  City: ${metro ? "Metro" : "Non-Metro"}  |  State (PT): ${profTaxState}  |  Basic: ${basicSalaryPercent}%`, 14, y); y += 9; sep();
+
+    doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.text("EARNINGS", 14, y); y += 7;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    line("Gross Fixed Salary",           fv(salaryDetails.grossSalaryAnnual));
+    line("  Basic Salary",               fv(salaryDetails.basicAnnual),              4);
+    line("  HRA",                        fv(salaryDetails.hraAnnual),                4);
+    line("  Special Allowance",          fv(salaryDetails.specialAllowanceAnnual),   4);
+    if (salaryDetails.variablePayAnnual)    line("Variable Pay",    fv(salaryDetails.variablePayAnnual));
+    if (salaryDetails.joiningBonusAnnual)   line("Joining Bonus",   fv(salaryDetails.joiningBonusAnnual));
+    if (salaryDetails.retentionBonusAnnual) line("Retention Bonus", fv(salaryDetails.retentionBonusAnnual));
+    y += 2; sep();
+
+    doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.text("EMPLOYER CONTRIBUTIONS", 14, y); y += 7;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    line("Employer PF",     fv(salaryDetails.employerPFAnnual));
+    line("Est. Gratuity",   fv(salaryDetails.gratuityAnnual));
+    y += 2; sep();
+
+    doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.text("DEDUCTIONS", 14, y); y += 7;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    line("Employee PF",                  fv(salaryDetails.employeePFAnnual));
+    if (salaryDetails.profTaxAnnual > 0) line("Professional Tax", fv(salaryDetails.profTaxAnnual));
+    line("Income Tax (incl. 4% cess)",   fv(salaryDetails.tax));
+    y += 2; sep();
+
+    doc.setFontSize(11); doc.setFont("helvetica", "bold"); doc.text("SUMMARY", 14, y); y += 7;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(10);
+    line("Taxable Income",               fv(salaryDetails.taxableIncome));
+    line("Total CTC",                    fv(salaryDetails.totalCTC));
+    line("Net In-Hand (Annual)",         fv(salaryDetails.netInHandAnnual));
+    line("Net In-Hand (Monthly)",        `\u20B9${(salaryDetails.netInHandAnnual / 12).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`);
+    line("Effective Tax Rate",           fmtPct(salaryDetails.effectiveTaxRate));
+    line("Marginal Tax Rate",            fmtPct(salaryDetails.marginalTaxRate));
+    y += 6;
+    doc.setFontSize(8); doc.setFont("helvetica", "italic");
+    doc.text("Gratuity is estimated (~4.81% of basic, per Payment of Gratuity Act). PT slabs are approximate. FY 2025-26 tax rules applied. Consult a CA for official computation.", 14, y, { maxWidth: 182 });
+    doc.save("salary_breakdown.pdf");
+  };
+
+  // ── Reset ──────────────────────────────────────────────────────────────────
+  function handleReset() {
+    setGrossSalaryInput(""); setVariablePayInput(""); setJoiningBonusInput(""); setRetentionBonusInput("");
+    setBasicSalaryPercent(40); setProfTaxState("Karnataka"); setMetro(true);
+    setMonthlyRentPaid(""); setOldDedns({ d80C: 0, d80D: 0, homeLoanInterest: 0, lta: 0, nps80CCD: 0 });
+    setShowOldDedns(false); setReverseInput(""); setReverseMode(false); setRegime("new");
+  }
+
+  function handleOfferReset() {
+    const blank = { grossSalaryInput: "", variablePayInput: "", joiningBonusInput: "", retentionBonusInput: "", basicSalaryPercent: 40, regime: "new", profTaxState: "Karnataka", metro: true };
+    setOffer1(blank); setOffer2(blank);
+  }
+
+  // ── Render helpers ─────────────────────────────────────────────────────────
+  const fixedCardStyle = { minHeight: "120px" };
+
+  function renderSalaryBreakup(details) {
+    if (!details) return null;
+    const greenBg   = { background: "rgba(34,197,94,0.08)",  border: "1px solid rgba(34,197,94,0.15)",  ...fixedCardStyle };
+    const blueBg    = { background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.15)", ...fixedCardStyle };
+    const redBg     = { background: "rgba(244,67,54,0.08)",  border: "1px solid rgba(244,67,54,0.15)",  ...fixedCardStyle };
+    const summaryBg = { background: "linear-gradient(90deg, #166534 80%, #22c55e 100%)", color: "#fff", borderRadius: "12px", fontWeight: 700, fontFamily: "var(--font-display)", fontSize: "1.15rem", boxShadow: "0 2px 8px 0 rgba(34,197,94,0.12)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", ...fixedCardStyle };
+    const fv = v => `\u20B9${fmt(fromAnnual(v))}`;
+    const hraPctLabel = metro ? "50%" : "40%";
+    const cityLabel   = metro ? "Metro" : "Non-Metro";
+
+    return (
+      <div style={{ marginTop: "1rem" }}>
+        <h3 style={{ marginBottom: "1rem" }}>Salary Breakup</h3>
+
+        <div style={{ marginBottom: "1.5rem" }}>
+          <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "1.1rem" }}>&#x1F4BC; Earnings</div>
+          <div className="result-grid">
+            <div className="result-card" style={greenBg}>
+              <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.grossSalaryAnnual)}</span>
+              <span className="result-label">Gross Fixed Salary</span>
+            </div>
+            <div className="result-card" style={greenBg}>
+              <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.basicAnnual)}</span>
+              <span className="result-label">Basic Salary</span>
+              <small style={{ color: "#666" }}>{basicSalaryPercent}% of Gross</small>
+            </div>
+            <div className="result-card" style={greenBg}>
+              <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.hraAnnual)}</span>
+              <span className="result-label">HRA</span>
+              <small style={{ color: "#666" }}>{hraPctLabel} of Basic ({cityLabel})</small>
+            </div>
+            <div className="result-card" style={greenBg}>
+              <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.specialAllowanceAnnual)}</span>
+              <span className="result-label">Special Allowance</span>
+              <small style={{ color: "#666" }}>Gross &minus; Basic &minus; HRA</small>
+            </div>
+            {details.variablePayAnnual > 0 && (
+              <div className="result-card" style={greenBg}>
+                <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.variablePayAnnual)}</span>
+                <span className="result-label">Variable Pay</span>
+              </div>
+            )}
+            {details.joiningBonusAnnual > 0 && (
+              <div className="result-card" style={greenBg}>
+                <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.joiningBonusAnnual)}</span>
+                <span className="result-label">Joining Bonus</span>
+              </div>
+            )}
+            {details.retentionBonusAnnual > 0 && (
+              <div className="result-card" style={greenBg}>
+                <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.retentionBonusAnnual)}</span>
+                <span className="result-label">Retention Bonus</span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ marginBottom: "1.5rem" }}>
+          <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "1.1rem" }}>&#x1F9FE; Employer Contributions</div>
+          <div className="result-grid">
+            <div className="result-card" style={blueBg}>
+              <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.employerPFAnnual)}</span>
+              <span className="result-label">Employer PF</span>
+              <small style={{ color: "#666" }}>12% of Basic (EPF ceiling &#x20B9;15K/mo)</small>
+            </div>
+            <div className="result-card" style={blueBg}>
+              <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.gratuityAnnual)}</span>
+              <span className="result-label">Est. Gratuity</span>
+              <small style={{ color: "#666" }}>~4.81% of Basic (accrued, paid at exit)</small>
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: "1.5rem" }}>
+          <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "1.1rem" }}>&#x2796; Deductions</div>
+          <div className="result-grid">
+            <div className="result-card" style={redBg}>
+              <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.employeePFAnnual)}</span>
+              <span className="result-label">Employee PF</span>
+              <small style={{ color: "#666" }}>12% of Basic (EPF ceiling applied)</small>
+            </div>
+            {details.profTaxAnnual > 0 && (
+              <div className="result-card" style={redBg}>
+                <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.profTaxAnnual)}</span>
+                <span className="result-label">Professional Tax</span>
+                <small style={{ color: "#666" }}>Section 16(iii) &mdash; state levy</small>
+              </div>
+            )}
+            <div className="result-card" style={redBg}>
+              <span className="result-value" style={{ fontSize: "1.2rem" }}>{fv(details.tax)}</span>
+              <span className="result-label">Income Tax</span>
+              <small style={{ color: "#666" }}>Incl. 4% cess</small>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "1.1rem" }}>&#x1F4B0; Final Summary</div>
+          <div className="result-grid">
+            <div className="result-card" style={summaryBg}>
+              <span style={{ fontSize: "1.35rem" }}>{fv(details.totalCTC)}</span>
+              <span style={{ marginTop: "0.4rem" }}>Total CTC</span>
+            </div>
+            <div className="result-card" style={summaryBg}>
+              <span style={{ fontSize: "1.35rem" }}>{fv(details.netInHandAnnual)}</span>
+              <span style={{ marginTop: "0.4rem" }}>Annual In-Hand</span>
+            </div>
+            <div className="result-card" style={summaryBg}>
+              <span style={{ fontSize: "1.35rem" }}>\u20B9{fmt(details.netInHandAnnual / 12)}</span>
+              <span style={{ marginTop: "0.4rem" }}>Monthly In-Hand</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Donut chart — segments sum exactly to Total CTC ────────────────────────
+  // Proof: Net + Tax + EmpPF + PT + EmployerPF + Gratuity
+  //      = (TotalIncome - Tax - EmpPF - PT) + Tax + EmpPF + PT + EmployerPF + Gratuity
+  //      = TotalIncome + EmployerPF + Gratuity = Total CTC
+  function renderDonutChart(details) {
+    if (!details) return null;
+    const data = [
+      { name: "Net In-Hand",   value: Math.max(0, details.netInHandAnnual), color: COLORS.netPay     },
+      { name: "Income Tax",    value: details.tax,                          color: COLORS.tax        },
+      { name: "Employee PF",   value: details.employeePFAnnual,             color: COLORS.empPF      },
+      { name: "Employer PF",   value: details.employerPFAnnual,             color: COLORS.employerPF },
+      { name: "Est. Gratuity", value: details.gratuityAnnual,               color: COLORS.gratuity   },
+      ...(details.profTaxAnnual > 0 ? [{ name: "Prof. Tax", value: details.profTaxAnnual, color: COLORS.profTax }] : []),
+    ].filter(d => d.value > 0);
+    if (!data.length) return null;
+    return (
+      <div style={{ width: "100%", height: 320, marginTop: "1rem" }}>
+        <p style={{ fontSize: "0.8rem", color: "var(--text-muted)", margin: "0 0 0.5rem", textAlign: "center" }}>
+          All segments sum to Total CTC (\u20B9{fmt(fromAnnual(details.totalCTC))})
+        </p>
+        <ResponsiveContainer>
+          <PieChart>
+            <Pie data={data} dataKey="value" nameKey="name" innerRadius="60%" outerRadius="80%" paddingAngle={3}
+              label={({ name, percent }) => `${name} ${(percent * 100).toFixed(1)}%`}>
+              {data.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+            </Pie>
+            <Legend verticalAlign="bottom" height={36} />
+            <Tooltip formatter={v => `\u20B9${fmt(fromAnnual(v))}`} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  }
+
+  // ── Offer comparison ───────────────────────────────────────────────────────
+  function renderOfferComparisonForm() {
+    const periodLabel = period === "monthly" ? "\u20B9/month" : "\u20B9/year";
+    const stateOpts   = Object.keys(PROFESSIONAL_TAX_STATES);
+
+    function offerFields(offer, setOffer, title) {
+      return (
+        <div>
+          <h4>{title}</h4>
+          {[["Gross Salary", "grossSalaryInput"], ["Variable Pay", "variablePayInput"], ["Joining Bonus", "joiningBonusInput"], ["Retention Bonus", "retentionBonusInput"]].map(([lbl, key]) => (
+            <div className="form-field" key={key}>
+              <label className="form-label">{lbl} ({periodLabel})</label>
+              <input className="form-input" type="number" min="0" value={offer[key]}
+                onChange={e => setOffer(p => ({ ...p, [key]: e.target.value }))} placeholder="e.g. 0" />
+            </div>
+          ))}
+          <div className="form-field">
+            <label className="form-label">Basic Salary % ({offer.basicSalaryPercent}%)</label>
+            <input type="range" min="35" max="50" value={offer.basicSalaryPercent}
+              onChange={e => setOffer(p => ({ ...p, basicSalaryPercent: Number(e.target.value) }))} />
+          </div>
+          <div className="form-field">
+            <label className="form-label">Tax Regime</label>
+            <select className="form-input" value={offer.regime} onChange={e => setOffer(p => ({ ...p, regime: e.target.value }))}>
+              <option value="new">New Regime</option>
+              <option value="old">Old Regime</option>
+            </select>
+          </div>
+          <div className="form-field">
+            <label className="form-label">City Type (HRA)</label>
+            <select className="form-input" value={offer.metro ? "metro" : "nonmetro"} onChange={e => setOffer(p => ({ ...p, metro: e.target.value === "metro" }))}>
+              <option value="metro">Metro (50% HRA)</option>
+              <option value="nonmetro">Non-Metro (40% HRA)</option>
+            </select>
+          </div>
+          <div className="form-field">
+            <label className="form-label">Professional Tax State</label>
+            <select className="form-input" value={offer.profTaxState} onChange={e => setOffer(p => ({ ...p, profTaxState: e.target.value }))}>
+              {stateOpts.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <h3>Offer Comparison</h3>
+        <div className="form-grid">
+          {offerFields(offer1, setOffer1, "Offer 1")}
+          {offerFields(offer2, setOffer2, "Offer 2")}
+        </div>
+        {offer1Details && offer2Details && (() => {
+          const d1 = offer1Details, d2 = offer2Details;
+          const rows = [
+            { label: "Net In-Hand",    v1: d1.netInHandAnnual,  v2: d2.netInHandAnnual,  higherBetter: true  },
+            { label: "Income Tax",     v1: d1.tax,              v2: d2.tax,              higherBetter: false },
+            { label: "Total CTC",      v1: d1.totalCTC,         v2: d2.totalCTC,         higherBetter: true  },
+            { label: "Effective Rate", v1: d1.effectiveTaxRate, v2: d2.effectiveTaxRate, higherBetter: false, pct: true },
+          ];
+          const winner = d1.netInHandAnnual >= d2.netInHandAnnual ? "Offer 1" : "Offer 2";
+          const diff   = Math.abs(d1.netInHandAnnual - d2.netInHandAnnual);
+          return (
+            <>
+              <div className="result-grid" style={{ marginTop: "1rem" }}>
+                {rows.map((row, i) => {
+                  const o1better = row.higherBetter ? row.v1 >= row.v2 : row.v1 <= row.v2;
+                  return (
+                    <div key={i} className="result-card" style={{ minHeight: "80px" }}>
+                      <strong>{row.label}</strong>
+                      <div style={{ marginTop: 6 }}>
+                        <span style={{ color: o1better ? "var(--success)" : undefined, marginRight: 8 }}>
+                          O1: {row.pct ? fmtPct(row.v1) : `\u20B9${fmt(fromAnnual(row.v1))}`}
+                        </span>
+                        <span style={{ color: !o1better ? "var(--success)" : undefined }}>
+                          O2: {row.pct ? fmtPct(row.v2) : `\u20B9${fmt(fromAnnual(row.v2))}`}
+                        </span>
+                      </div>
+                      <small>{o1better ? "Offer 1 better" : "Offer 2 better"}</small>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="result-card" style={{ marginTop: "1rem", background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.25)" }}>
+                <div style={{ color: "var(--success)", fontWeight: 700, fontSize: "1.1rem" }}>
+                  &#x1F3C6; {winner} gives \u20B9{fmt(fromAnnual(diff))} higher net in-hand
+                </div>
+              </div>
+            </>
+          );
+        })()}
+        <div className="tool-actions" style={{ marginTop: "1rem" }}>
+          <button className="btn-tool btn-reset" onClick={handleOfferReset}>&#x21BA; Reset Offers</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Tax Regime Comparison Table ────────────────────────────────────────────
+  // Used in Old vs New Tax Regime comparison
+  const TAX_REGIME_TABLE = [
+    { feature: "Tax Slabs", old: "Same slabs across India (Old Regime)", newR: "Same slabs across India (New Regime)" },
+    { feature: "Professional Tax", old: "Varies by state", newR: "Varies by state" },
+    {
+      feature: "PF Calculation",
+      old: "12% of Basic Salary (EPF wage ceiling ₹15,000/month applies)",
+      newR: "12% of Basic Salary (EPF wage ceiling ₹15,000/month applies)"
+    },
+    { feature: "Best suited for", old: "High deductions (>₹3.5L)", newR: "Simple structure / fewer deductions" },
+    // ... (add more rows as needed)
+  ];
+
+  const periodLabel  = period === "monthly" ? "\u20B9/month" : "\u20B9/year";
+  const stateOptions = Object.keys(PROFESSIONAL_TAX_STATES);
 
   return (
-    <ToolPageLayout tool={{ ...tool, faqs: [] }}>
-      <SalaryCalc />
+    <section className="tool-section" id="salary">
+      <div className="tool-header">
+        <div className="tool-tag">&#x1F4B0; Finance</div>
+        <h2 className="tool-title">Salary Calculator</h2>
+        <p className="tool-desc">Accurate Indian salary calculator &mdash; CTC breakdown, Old vs New Regime, HRA, professional tax, PF &amp; more (FY 2025-26).</p>
+      </div>
 
-      {/* 1 — Introduction */}
-      <section aria-label="About the Salary Calculator" style={{ ...sectionStyle, marginTop: "2rem" }}>
-        <h2 style={h2Style}>Free Salary Calculator India — CTC to In-Hand Monthly Salary</h2>
-        <p style={bodyStyle}>
-          When you receive a job offer, the number on the letter is your CTC — Cost to Company. This is not your
-          take-home salary. Between your CTC and the amount credited to your bank account every month lies a set of
-          deductions that most freshers and even experienced professionals underestimate. This salary calculator
-          bridges that gap by showing you exactly what you will actually earn.
-        </p>
-        <p style={{ ...bodyStyle, marginTop: "0.85rem" }}>
-          The calculator uses the New Tax Regime (FY 2024-25), which is now the default regime for salaried
-          employees in India. It deducts income tax based on the latest slab rates, applies a 4% health and
-          education cess, and caps PF at ₹21,600 per year in line with the EPF wage ceiling. The result is
-          your real monthly in-hand salary — the number that matters when you are deciding whether to accept
-          an offer, negotiate a hike, or plan your monthly budget.
-        </p>
-        <p style={{ ...bodyStyle, marginTop: "0.85rem" }}>
-          Understanding your salary breakdown is more important than knowing your CTC. Two candidates with
-          identical CTC packages can have very different in-hand salaries depending on their salary structure,
-          tax regime choice, and applicable deductions. A candidate with a higher basic salary and employer
-          PF may take home less than one with a lower CTC but no PF deduction and a higher variable component.
-        </p>
-        <p style={{ ...bodyStyle, marginTop: "0.85rem" }}>
-          Use this calculator before every salary negotiation, job change, and tax filing season. It gives
-          you clarity on what you are earning, what you are losing to deductions, and what you can realistically
-          spend, save, and invest every month. No sign-up required — results appear instantly.
-        </p>
-      </section>
+      {/* Mode + Period Row */}
+      <div className="form-grid" style={{ marginBottom: "1rem" }}>
+        <div className="form-field">
+          <label className="form-label">Input Period</label>
+          <select className="form-input" value={period} onChange={e => setPeriod(e.target.value)}>
+            <option value="annual">Annual (\u20B9/year)</option>
+            <option value="monthly">Monthly (\u20B9/month)</option>
+          </select>
+        </div>
+        <div className="form-field">
+          <label className="form-label">Reverse Calculator</label>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}>
+            <input type="checkbox" checked={reverseMode} onChange={e => setReverseMode(e.target.checked)} style={{ width: "1.2rem", height: "1.2rem" }} />
+            <span style={{ fontSize: "0.9rem" }}>Estimate gross salary from desired net in-hand</span>
+          </label>
+        </div>
+        <div className="form-field">
+          <label className="form-label">Offer Comparison Mode</label>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer" }}>
+            <input type="checkbox" checked={offerComparisonMode} onChange={e => setOfferComparisonMode(e.target.checked)} style={{ width: "1.2rem", height: "1.2rem" }} />
+            <span style={{ fontSize: "0.9rem" }}>Compare two salary offers side-by-side</span>
+          </label>
+        </div>
+      </div>
 
-      {/* 2 — How to Use */}
-      <section aria-label="How to use the salary calculator" style={sectionStyle}>
-        <h2 style={h2Style}>How to Use This Salary Calculator — Step by Step</h2>
-        <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {HOW_STEPS.map(step => (
-            <li key={step.n} style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
-              <span aria-hidden="true" style={{ flexShrink: 0, width: 28, height: 28, borderRadius: "50%", background: "var(--accent-muted)", border: "1px solid rgba(79,107,255,0.25)", color: "var(--accent)", fontFamily: "var(--font-display)", fontWeight: 800, fontSize: "0.8rem", display: "flex", alignItems: "center", justifyContent: "center", marginTop: 2 }}>{step.n}</span>
-              <div>
-                <p style={{ fontWeight: 600, color: "var(--text-primary)", fontSize: "0.9rem", margin: "0 0 0.25rem" }}>{step.title}</p>
-                <p style={{ ...bodyStyle, lineHeight: 1.65 }}>{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
-
-      {/* 3 — Formula */}
-      <section aria-label="Salary calculation formula" style={sectionStyle}>
-        <h2 style={h2Style}>Salary Calculation Formula</h2>
-        <p style={labelStyle}>Step 1 — Monthly and Annual Gross</p>
-        <code style={codeBlockStyle}>Monthly Gross = Annual CTC / 12</code>
-        <code style={codeBlockStyle}>Annual Gross = CTC (assumed full fixed package)</code>
-
-        <p style={{ ...labelStyle, marginTop: "1.25rem" }}>Step 2 — Income Tax (New Regime, FY 2024-25)</p>
-        <code style={codeBlockStyle}>0%   → Income up to ₹3,00,000</code>
-        <code style={codeBlockStyle}>5%   → ₹3,00,001 to ₹6,00,000</code>
-        <code style={codeBlockStyle}>10%  → ₹6,00,001 to ₹9,00,000</code>
-        <code style={codeBlockStyle}>15%  → ₹9,00,001 to ₹12,00,000</code>
-        <code style={codeBlockStyle}>20%  → ₹12,00,001 to ₹15,00,000</code>
-        <code style={codeBlockStyle}>30%  → Above ₹15,00,000</code>
-        <code style={{ ...codeBlockStyle, color: "var(--accent)" }}>Total Tax = Slab Tax + 4% Health & Education Cess</code>
-
-        <p style={{ ...labelStyle, marginTop: "1.25rem" }}>Step 3 — PF Deduction</p>
-        <code style={codeBlockStyle}>PF = min(Annual CTC × 12%, ₹21,600)</code>
-        <p style={{ ...bodyStyle, fontSize: "0.85rem", margin: "0.5rem 0 1.25rem" }}>PF is capped at ₹21,600/year (₹1,800/month) per EPF wage ceiling on ₹15,000 basic.</p>
-
-        <p style={labelStyle}>Step 4 — Annual In-Hand</p>
-        <code style={{ ...codeBlockStyle, color: "var(--accent)" }}>Annual In-Hand = CTC − Total Tax − PF</code>
-        <code style={codeBlockStyle}>Monthly In-Hand = Annual In-Hand / 12</code>
-      </section>
-
-      {/* 4 — Worked Example */}
-      <section aria-label="Salary worked example" style={sectionStyle}>
-        <h2 style={h2Style}>Worked Example — ₹12 LPA CTC</h2>
-        <p style={{ ...bodyStyle, marginBottom: "1rem" }}>
-          A software developer receives an offer of ₹12,00,000 CTC per year. Here is the full breakdown
-          under the New Tax Regime (FY 2024-25):
-        </p>
-
-        <p style={labelStyle}>Input</p>
-        <code style={codeBlockStyle}>Annual CTC = ₹12,00,000</code>
-        <code style={codeBlockStyle}>Monthly Gross = ₹12,00,000 / 12 = ₹1,00,000</code>
-
-        <p style={{ ...labelStyle, marginTop: "1rem" }}>Income Tax Calculation (New Regime)</p>
-        <code style={codeBlockStyle}>0% on ₹3,00,000          = ₹0</code>
-        <code style={codeBlockStyle}>5% on ₹3,00,000          = ₹15,000</code>
-        <code style={codeBlockStyle}>10% on ₹3,00,000         = ₹30,000</code>
-        <code style={codeBlockStyle}>15% on ₹3,00,000         = ₹45,000</code>
-        <code style={codeBlockStyle}>Subtotal Tax              = ₹90,000</code>
-        <code style={codeBlockStyle}>4% Cess on ₹90,000       = ₹3,600</code>
-        <code style={{ ...codeBlockStyle, color: "var(--warning)" }}>Total Income Tax          = ₹93,600 / year  →  ₹7,800 / month</code>
-
-        <p style={{ ...labelStyle, marginTop: "1rem" }}>PF Deduction</p>
-        <code style={codeBlockStyle}>12% of ₹12,00,000 = ₹1,44,000 → Capped at ₹21,600 / year</code>
-        <code style={{ ...codeBlockStyle, color: "var(--warning)" }}>Monthly PF                = ₹1,800</code>
-
-        <p style={{ ...labelStyle, marginTop: "1rem" }}>Final Result</p>
-        <code style={codeBlockStyle}>Annual In-Hand = ₹12,00,000 − ₹93,600 − ₹21,600 = ₹10,84,800</code>
-        <code style={{ ...codeBlockStyle, color: "var(--accent)" }}>Monthly In-Hand = ₹10,84,800 / 12 = ₹90,400</code>
-        <p style={{ ...bodyStyle, fontSize: "0.85rem", marginTop: "0.75rem" }}>
-          On a ₹12 LPA CTC, you take home approximately{" "}
-          <code style={inlineCode}>₹90,400/month</code> under the New Tax Regime — about 90.4% of monthly gross.
-        </p>
-      </section>
-
-      {/* 5 — Salary Components Table */}
-      <section aria-label="Salary components breakdown table" style={sectionStyle}>
-        <h2 style={h2Style}>Salary Components — What Each Part Means</h2>
-        <p style={{ ...bodyStyle, marginBottom: "1.25rem" }}>
-          A typical Indian salary structure includes several components. Understanding each helps you evaluate
-          an offer accurately and identify opportunities to optimise your take-home.
-        </p>
-        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "1.5fr 2fr 1fr 1fr", background: "var(--bg-input)", borderBottom: "1px solid var(--border)", minWidth: 520 }}>
-            {["Component", "Meaning", "Typical %", "Example (₹10L CTC)"].map(h => <span key={h} style={thStyle}>{h}</span>)}
-          </div>
-          {SALARY_COMPONENTS.map((row, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "1.5fr 2fr 1fr 1fr", borderBottom: i < SALARY_COMPONENTS.length - 1 ? "1px solid var(--border)" : "none", minWidth: 520, alignItems: "center" }}>
-              <span style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", color: "var(--accent)", fontWeight: 600 }}>{row.component}</span>
-              <span style={{ padding: "0.55rem 1rem", fontSize: "0.82rem", color: "var(--text-secondary)" }}>{row.meaning}</span>
-              <span style={{ padding: "0.55rem 1rem", fontSize: "0.82rem", color: "var(--text-muted)" }}>{row.pct}</span>
-              <span style={{ padding: "0.55rem 1rem", fontSize: "0.82rem", color: "var(--text-primary)", fontWeight: 500 }}>{row.example}</span>
+      {/* Main Calculator */}
+      {!offerComparisonMode && !reverseMode && (
+        <>
+          <div className="form-grid">
+            <div className="form-field">
+              <label className="form-label">Gross Fixed Salary ({periodLabel})</label>
+              <input className="form-input" type="number" min="0"
+                placeholder={period === "monthly" ? "e.g. 60000" : "e.g. 720000"}
+                value={grossSalaryInput} onChange={e => setGrossSalaryInput(e.target.value)} />
             </div>
-          ))}
-        </div>
-      </section>
-
-      {/* 6 — Tax Regime Comparison */}
-      <section aria-label="Old vs New Tax Regime comparison" style={sectionStyle}>
-        <h2 style={h2Style}>Old vs New Tax Regime — Which is Better for You?</h2>
-        <p style={{ ...bodyStyle, marginBottom: "1.25rem" }}>
-          Since FY 2023-24, the New Tax Regime is the default. You must actively opt for the Old Regime
-          if you want to claim deductions. The right choice depends on your deductions. Here is a side-by-side comparison:
-        </p>
-        <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", overflow: "auto" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1.5fr", background: "var(--bg-input)", borderBottom: "1px solid var(--border)", minWidth: 420 }}>
-            {["Feature", "Old Regime", "New Regime (Default)"].map(h => <span key={h} style={thStyle}>{h}</span>)}
-          </div>
-          {TAX_REGIME_TABLE.map((row, i) => (
-            <div key={i} style={{ display: "grid", gridTemplateColumns: "2fr 1.5fr 1.5fr", borderBottom: i < TAX_REGIME_TABLE.length - 1 ? "1px solid var(--border)" : "none", minWidth: 420, alignItems: "center" }}>
-              <span style={{ padding: "0.55rem 1rem", fontSize: "0.85rem", color: "var(--text-primary)", fontWeight: 500 }}>{row.feature}</span>
-              <span style={{ padding: "0.55rem 1rem", fontSize: "0.82rem", color: "var(--warning)" }}>{row.old}</span>
-              <span style={{ padding: "0.55rem 1rem", fontSize: "0.82rem", color: "var(--accent)" }}>{row.newR}</span>
+            <div className="form-field">
+              <label className="form-label">Variable Pay ({periodLabel})</label>
+              <input className="form-input" type="number" min="0"
+                placeholder="e.g. 100000" value={variablePayInput} onChange={e => setVariablePayInput(e.target.value)} />
             </div>
-          ))}
-        </div>
-        <p style={{ ...bodyStyle, marginTop: "1rem", fontSize: "0.85rem" }}>
-          <strong style={{ color: "var(--text-primary)" }}>Quick rule:</strong> If your annual deductions (80C + HRA + home loan + other) exceed ₹3.5 lakh, the Old Regime
-          likely saves more tax. For most salaried freshers and mid-level employees with fewer deductions,
-          the New Regime results in lower tax.
-        </p>
-      </section>
-
-      {/* 7 — Interpret Salary */}
-      <section aria-label="How to interpret your monthly in-hand salary" style={sectionStyle}>
-        <h2 style={h2Style}>What Your Monthly In-Hand Salary Means</h2>
-        {[
-          { range: "Below ₹25,000 / month", label: "Entry Level", body: "Typical for freshers in Tier-2 cities, BPO roles, teaching, retail, and junior positions. Sufficient for basic living if housing costs are low. Focus on building skills aggressively to move to the next bracket within 18–24 months." },
-          { range: "₹25,000 – ₹50,000 / month", label: "Growing", body: "The salary range for 2–5 year professionals in mid-size companies and most government jobs. Comfortable for single individuals in metro cities when shared accommodation is opted for. Savings of 15–20% are achievable with careful budgeting." },
-          { range: "₹50,000 – ₹1,00,000 / month", label: "Good", body: "Corresponds to senior professionals, experienced engineers, product managers, and finance roles at established companies. Allows meaningful investment, EMI repayments, and lifestyle upgrades. Tax planning becomes important at this level." },
-          { range: "Above ₹1,00,000 / month", label: "Excellent", body: "Senior managers, engineering leads, finance professionals, and specialist consultants. At this level, optimising your salary structure (higher special allowance, NPS contributions, correct tax regime) can save ₹50,000–₹1,50,000 annually in taxes. Professional financial planning is strongly recommended." },
-        ].map((item, i) => (
-          <div key={i} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderLeft: "3px solid var(--accent)", borderRadius: "var(--radius-md)", padding: "1rem 1.25rem", marginBottom: i < 3 ? "0.75rem" : 0 }}>
-            <p style={{ fontWeight: 700, color: "var(--text-primary)", fontSize: "0.875rem", margin: "0 0 0.35rem" }}>{item.range} — <span style={{ color: "var(--accent)" }}>{item.label}</span></p>
-            <p style={{ ...bodyStyle, fontSize: "0.865rem" }}>{item.body}</p>
+            <div className="form-field">
+              <label className="form-label">Joining Bonus ({periodLabel})</label>
+              <input className="form-input" type="number" min="0"
+                placeholder="e.g. 50000" value={joiningBonusInput} onChange={e => setJoiningBonusInput(e.target.value)} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Retention Bonus ({periodLabel})</label>
+              <input className="form-input" type="number" min="0"
+                placeholder="e.g. 40000" value={retentionBonusInput} onChange={e => setRetentionBonusInput(e.target.value)} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Basic Salary % ({basicSalaryPercent}%)</label>
+              <input type="range" min="35" max="50" value={basicSalaryPercent}
+                onChange={e => setBasicSalaryPercent(Number(e.target.value))} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Tax Regime</label>
+              <select className="form-input" value={regime} onChange={e => setRegime(e.target.value)}>
+                <option value="new">New Regime (FY 2025-26)</option>
+                <option value="old">Old Regime</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <label className="form-label">City Type (HRA)</label>
+              <select className="form-input" value={metro ? "metro" : "nonmetro"} onChange={e => setMetro(e.target.value === "metro")}>
+                <option value="metro">Metro City (50% HRA)</option>
+                <option value="nonmetro">Non-Metro City (40% HRA)</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <label className="form-label">Professional Tax State</label>
+              <select className="form-input" value={profTaxState} onChange={e => setProfTaxState(e.target.value)}>
+                {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
           </div>
-        ))}
-      </section>
 
-      {/* 8 — Common Mistakes */}
-      <section aria-label="Common salary calculation mistakes" style={sectionStyle}>
-        <h2 style={h2Style}>Common Salary Mistakes Employees Make</h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
-          {[
-            { title: "Confusing CTC with in-hand salary", body: "The most common mistake. When comparing two offers, always compare in-hand salaries, not CTC. A ₹15 LPA offer with no allowances and high PF can yield less take-home than a ₹12 LPA offer with a favourable structure." },
-            { title: "Choosing the wrong tax regime", body: "Many employees default to the New Regime without calculating whether the Old Regime saves more tax. If you have a home loan, pay rent, and invest ₹1.5L in ELSS, the Old Regime can save ₹40,000–₹80,000 annually on incomes between ₹10–20 LPA." },
-            { title: "Ignoring PF as part of the savings equation", body: "PF deduction feels like lost income but is actually forced savings earning 8.25% tax-free interest. On a 30-year career, ₹21,600/year in PF (with matching employer contribution) compounds to a significant retirement corpus. Do not view PF only as a deduction." },
-            { title: "Not accounting for variable pay in budgeting", body: "Many CTC structures include 10–20% variable (performance bonus). This is not guaranteed and should not be counted as part of monthly budget. Plan finances on fixed in-hand only and treat variable pay as surplus when it arrives." },
-          ].map((item, i) => (
-            <article key={i} style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "1rem 1.25rem" }}>
-              <h3 style={{ fontFamily: "var(--font-display)", fontSize: "0.9rem", fontWeight: 700, color: "var(--text-primary)", marginBottom: "0.4rem" }}>{i + 1}. {item.title}</h3>
-              <p style={{ ...bodyStyle, fontSize: "0.865rem" }}>{item.body}</p>
-            </article>
-          ))}
-        </div>
-      </section>
+          {/* Old Regime Deductions */}
+          {regime === "old" && (
+            <div style={{ marginTop: "0.75rem" }}>
+              <button onClick={() => setShowOldDedns(v => !v)}
+                style={{ background: "transparent", border: "1px solid var(--border)", borderRadius: "var(--radius-sm)", color: "var(--text-muted)", fontSize: "0.82rem", fontWeight: 600, fontFamily: "var(--font-body)", cursor: "pointer", padding: "5px 12px" }}>
+                {showOldDedns ? "\u25B2 Hide" : "\u25BC Show"} Old Regime Deductions (80C, 80D, HRA, Home Loan, LTA, NPS)
+              </button>
+              {showOldDedns && (
+                <div style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "1rem", marginTop: "0.5rem" }}>
+                  <div className="form-grid">
+                    <div className="form-field">
+                      <label className="form-label">Monthly Rent Paid (\u20B9) &mdash; for HRA exemption</label>
+                      <input className="form-input" type="number" min="0" placeholder="e.g. 25000 (blank = full HRA exempt)"
+                        value={monthlyRentPaid} onChange={e => setMonthlyRentPaid(e.target.value)} />
+                      <small style={{ color: "var(--text-muted)", fontSize: "0.75rem" }}>Leave blank to assume full HRA exemption. Enter actual rent for Section 10(13A) calculation.</small>
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">80C Investments (\u20B9) &mdash; max \u20B91,50,000</label>
+                      <input className="form-input" type="number" min="0" max="150000"
+                        placeholder="e.g. 100000 (PPF, ELSS, LIC — EPF auto-included)"
+                        value={oldDedns.d80C || ""}
+                        onChange={e => setOldDedns(d => ({ ...d, d80C: clampNonNegative(e.target.value) }))} />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">80D Medical Insurance (\u20B9)</label>
+                      <input className="form-input" type="number" min="0"
+                        placeholder="e.g. 25000 (self) + 50000 (senior parents)"
+                        value={oldDedns.d80D || ""}
+                        onChange={e => setOldDedns(d => ({ ...d, d80D: clampNonNegative(e.target.value) }))} />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">Home Loan Interest/yr (\u20B9) &mdash; max \u20B92,00,000</label>
+                      <input className="form-input" type="number" min="0"
+                        placeholder="e.g. 200000 (Section 24b, self-occupied)"
+                        value={oldDedns.homeLoanInterest || ""}
+                        onChange={e => setOldDedns(d => ({ ...d, homeLoanInterest: clampNonNegative(e.target.value) }))} />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">LTA (Leave Travel Allowance) (\u20B9)</label>
+                      <input className="form-input" type="number" min="0"
+                        placeholder="e.g. 40000 (annual equivalent)"
+                        value={oldDedns.lta || ""}
+                        onChange={e => setOldDedns(d => ({ ...d, lta: clampNonNegative(e.target.value) }))} />
+                    </div>
+                    <div className="form-field">
+                      <label className="form-label">NPS 80CCD(1B) (\u20B9) &mdash; max \u20B950,000</label>
+                      <input className="form-input" type="number" min="0" max="50000"
+                        placeholder="e.g. 50000 (over and above 80C)"
+                        value={oldDedns.nps80CCD || ""}
+                        onChange={e => setOldDedns(d => ({ ...d, nps80CCD: clampNonNegative(e.target.value) }))} />
+                    </div>
+                  </div>
+                  <p className="info-text">Employee PF auto-included in 80C (total capped at \u20B91.5L). Standard deduction \u20B950,000 applied automatically.</p>
+                </div>
+              )}
+            </div>
+          )}
 
-      {/* 9 — Tips */}
-      <section aria-label="Salary saving and planning tips" style={sectionStyle}>
-        <h2 style={h2Style}>Tips to Maximise Your Take-Home and Build Wealth</h2>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "0.65rem" }}>
-          {[
-            "Invest ₹1.5L per year in 80C instruments (PPF, ELSS, EPF, LIC) if using Old Regime — this saves ₹15,000–₹45,000 in tax depending on your slab.",
-            "Contribute to NPS Tier 1 for an extra deduction under Section 80CCD(2) — this works in both regimes and provides 10% of basic as employer NPS contribution tax-free.",
-            "Check if your employer offers meal vouchers or food coupons (up to ₹2,200/month tax-free) or Leave Travel Allowance (LTA) — these reduce taxable income without changing your CTC.",
-            "Build a 3–6 month emergency fund in a liquid fund before investing in markets. This prevents you from breaking long-term investments during financial emergencies.",
-            "Negotiate salary structure, not just CTC. Ask HR for a higher special allowance and lower basic during negotiations — this can increase take-home while keeping CTC constant.",
-            "Review your tax regime choice every year in April. As income grows and life circumstances change (home loan, marriage, children), the optimal regime can switch between Old and New.",
-            "Start a SIP in an index fund with even 10–15% of your take-home. Consistency over 10+ years produces returns that significantly outpace inflation.",
-          ].map((tip, i) => (
-            <li key={i} style={{ display: "flex", gap: "0.75rem", alignItems: "flex-start" }}>
-              <span style={{ color: "var(--accent)", fontWeight: 800, fontSize: "0.9rem", flexShrink: 0, marginTop: 1 }}>→</span>
-              <p style={{ ...bodyStyle, fontSize: "0.865rem" }}>{tip}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {/* 10 — FAQ */}
-      <section aria-label="Salary calculator FAQs" style={sectionStyle} itemScope itemType="https://schema.org/FAQPage">
-        <h2 style={h2Style}>Frequently Asked Questions about Salary Calculation</h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: "0.875rem" }}>
-          {FAQS.map((faq, i) => (
-            <article key={i} itemScope itemType="https://schema.org/Question" itemProp="mainEntity" style={{ background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "1.1rem 1.25rem" }}>
-              <h3 itemProp="name" style={{ fontFamily: "var(--font-display)", fontSize: "0.92rem", fontWeight: 700, color: "var(--text-primary)", marginBottom: "0.5rem", lineHeight: 1.4 }}>{faq.q}</h3>
-              <div itemScope itemType="https://schema.org/Answer" itemProp="acceptedAnswer">
-                <p itemProp="text" style={{ ...bodyStyle, fontSize: "0.865rem" }}>{faq.a}</p>
+          {salaryDetails && (
+            <>
+              <div className="result-main" style={{ marginTop: "1rem" }}>
+                <div>
+                  <div className="result-main-value">\u20B9{fmt(fromAnnual(salaryDetails.netInHandAnnual))}</div>
+                  <div className="result-main-label">{period === "monthly" ? "Monthly" : "Annual"} Net In-Hand</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: "1.3rem", fontWeight: 700, color: "var(--success)" }}>
+                    \u20B9{fmt(fromAnnual(salaryDetails.totalCTC))}
+                  </div>
+                  <div className="result-main-label">Total CTC</div>
+                </div>
               </div>
-            </article>
-          ))}
-        </div>
-      </section>
 
-      {/* 11 — Related Tools */}
-      <section aria-label="Related financial and academic tools" style={{ ...sectionStyle, marginBottom: "1rem" }}>
-        <h2 style={h2Style}>Related Tools</h2>
-        <p style={{ ...bodyStyle, marginBottom: "1.25rem", fontSize: "0.865rem" }}>Other calculators students and professionals use alongside the salary calculator.</p>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(175px, 1fr))", gap: "0.875rem" }}>
-          {relatedTools.map(t => (
-            <Link key={t.id} to={t.path} aria-label={`Open ${t.name}`}
-              style={{ display: "flex", alignItems: "center", gap: "0.75rem", background: "var(--bg-card)", border: "1px solid var(--border)", borderRadius: "var(--radius-md)", padding: "0.875rem 1rem", textDecoration: "none", transition: "border-color 0.2s, background 0.2s" }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "var(--accent)"; e.currentTarget.style.background = "var(--bg-card-hover)"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "var(--border)"; e.currentTarget.style.background = "var(--bg-card)"; }}>
-              <span style={{ fontSize: "1.2rem", flexShrink: 0 }} aria-hidden="true">{t.icon}</span>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: "0.85rem", color: "var(--text-primary)", lineHeight: 1.3 }}>{t.shortName}</div>
-                <div style={{ fontSize: "0.74rem", color: "var(--text-muted)", marginTop: 2 }}>{t.desc}</div>
+              {renderSalaryBreakup(salaryDetails)}
+
+              <div className="result-grid" style={{ marginTop: "1rem" }}>
+                <div className="result-card" style={fixedCardStyle}>
+                  <span className="result-value text-danger" style={{ fontSize: "1.2rem" }}>\u20B9{fmt(fromAnnual(salaryDetails.tax))}</span>
+                  <span className="result-label">Income Tax</span>
+                  <small style={{ color: "#666" }}>Incl. 4% cess</small>
+                </div>
+                <div className="result-card" style={fixedCardStyle}>
+                  <span className="result-value">{fmtPct(salaryDetails.effectiveTaxRate)}</span>
+                  <span className="result-label">Effective Tax Rate</span>
+                  <small style={{ color: "#666" }}>Tax &divide; Total Income</small>
+                </div>
+                <div className="result-card" style={fixedCardStyle}>
+                  <span className="result-value">{fmtPct(salaryDetails.marginalTaxRate)}</span>
+                  <span className="result-label">Marginal Tax Rate</span>
+                  <small style={{ color: "#666" }}>On next \u20B91 lakh</small>
+                </div>
+                <div className="result-card" style={fixedCardStyle}>
+                  <span className="result-value">\u20B9{fmt(fromAnnual(salaryDetails.taxableIncome))}</span>
+                  <span className="result-label">Taxable Income</span>
+                  <small style={{ color: "#666" }}>After all deductions</small>
+                </div>
               </div>
-            </Link>
-          ))}
-        </div>
-      </section>
-    </ToolPageLayout>
+
+              {renderDonutChart(salaryDetails)}
+
+              <p className="info-text" style={{ marginTop: "1rem" }}>
+                {regime === "new"
+                  ? "New Regime (FY 2025-26): Std. deduction \u20B975,000. Zero tax for taxable income \u226412L (Sec. 87A). Slabs: 5%/10%/15%/20%/25%/30%."
+                  : "Old Regime: Std. deduction \u20B950,000. 87A rebate up to \u20B912,500 for taxable \u22645L. HRA, 80C, 80D and other deductions applied."
+                }{" "}EPF capped at \u20B915K/mo basic wage ceiling. Gratuity is estimated (4.81% of annual basic, accrued, paid at exit after 5 years). PT: {profTaxState} (\u20B9{salaryDetails.profTaxMonthly}/month).
+              </p>
+
+              <div className="tool-actions">
+                <CopyBtn text={copyText} />
+                <button className="btn-tool btn-reset" onClick={handleReset}>&#x21BA; Reset</button>
+                <button className="btn-tool" onClick={handleDownloadPDF} disabled={!jsPDF}>&#x2B07; Download PDF</button>
+                <button className="btn-tool" onClick={handleShareResult}>&#x1F4E4; Share Result</button>
+              </div>
+
+              {comparisonDetails && (
+                <div style={{ marginTop: "2rem", borderTop: "1px solid var(--border)", paddingTop: "1rem" }}>
+                  <h3>Tax Regime Comparison</h3>
+                  <div className="result-grid">
+                    <div className="result-card">
+                      <strong>New Regime Tax</strong>
+                      <div style={{ fontSize: "1.4rem", fontWeight: 700, marginTop: "8px" }}>
+                        \u20B9{fmt(fromAnnual(comparisonDetails.newRegimeDetails.tax))}
+                      </div>
+                      <small>Net in-hand: \u20B9{fmt(fromAnnual(comparisonDetails.newRegimeDetails.netInHandAnnual))}</small>
+                    </div>
+                    <div className="result-card">
+                      <strong>Old Regime Tax</strong>
+                      <div style={{ fontSize: "1.4rem", fontWeight: 700, marginTop: "8px" }}>
+                        \u20B9{fmt(fromAnnual(comparisonDetails.oldRegimeDetails.tax))}
+                      </div>
+                      <small>Net in-hand: \u20B9{fmt(fromAnnual(comparisonDetails.oldRegimeDetails.netInHandAnnual))}</small>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: "24px" }}>
+                    <table className="regime-table" style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.98rem", marginBottom: "1rem" }}>
+                      <thead>
+                        <tr>
+                          <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "6px 8px" }}>Feature</th>
+                          <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "6px 8px" }}>Old Regime</th>
+                          <th style={{ textAlign: "left", borderBottom: "1px solid #ccc", padding: "6px 8px" }}>New Regime</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {TAX_REGIME_TABLE.map((row, i) => (
+                          <tr key={i}>
+                            <td style={{ padding: "5px 8px", borderBottom: "1px solid #eee" }}>{row.feature}</td>
+                            <td style={{ padding: "5px 8px", borderBottom: "1px solid #eee" }}>{row.old}</td>
+                            <td style={{ padding: "5px 8px", borderBottom: "1px solid #eee" }}>{row.newR}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="info-text" style={{ marginBottom: "0.5rem" }}>
+                      Income tax slabs are the same across India. Professional Tax and salary structure can vary by state and employer.
+                    </div>
+                  </div>
+                  <div className="result-card" style={{ marginTop: "16px", background: "rgba(34,197,94,.08)", border: "1px solid rgba(34,197,94,.25)" }}>
+                    <div style={{ color: "var(--success)", fontWeight: 700, fontSize: "1.1rem" }}>
+                      {comparisonDetails.taxDiff > 0 ? (
+                        <>\u2705 Save \u20B9{fmt(fromAnnual(comparisonDetails.savings))} with <strong>New Regime</strong></>
+                      ) : comparisonDetails.taxDiff < 0 ? (
+                        <>\u2705 Save \u20B9{fmt(fromAnnual(comparisonDetails.savings))} with <strong>Old Regime</strong></>
+                      ) : (
+                        <>\u2705 Both regimes result in equal tax.</>
+                      )}
+                    </div>
+                    {regime === "old" && Object.values(oldDedns).some(v => v > 0) && (
+                      <small style={{ color: "var(--text-muted)", marginTop: "0.3rem", display: "block" }}>
+                        Old Regime comparison uses your entered deductions.
+                      </small>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {/* Reverse Mode */}
+      {reverseMode && (
+        <>
+          <div className="form-grid">
+            <div className="form-field">
+              <label className="form-label">Desired Net In-Hand ({periodLabel})</label>
+              <input className="form-input" type="number" min="0"
+                placeholder={period === "monthly" ? "e.g. 60000" : "e.g. 720000"}
+                value={reverseInput} onChange={e => setReverseInput(e.target.value)} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Basic Salary % ({basicSalaryPercent}%)</label>
+              <input type="range" min="35" max="50" value={basicSalaryPercent}
+                onChange={e => setBasicSalaryPercent(Number(e.target.value))} />
+            </div>
+            <div className="form-field">
+              <label className="form-label">Tax Regime</label>
+              <select className="form-input" value={regime} onChange={e => setRegime(e.target.value)}>
+                <option value="new">New Regime (FY 2025-26)</option>
+                <option value="old">Old Regime</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <label className="form-label">City Type (HRA)</label>
+              <select className="form-input" value={metro ? "metro" : "nonmetro"} onChange={e => setMetro(e.target.value === "metro")}>
+                <option value="metro">Metro City (50% HRA)</option>
+                <option value="nonmetro">Non-Metro City (40% HRA)</option>
+              </select>
+            </div>
+            <div className="form-field">
+              <label className="form-label">Professional Tax State</label>
+              <select className="form-input" value={profTaxState} onChange={e => setProfTaxState(e.target.value)}>
+                {stateOptions.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {reverseResult && (
+            <>
+              <div className="result-main" style={{ marginTop: "1rem" }}>
+                <div>
+                  <div className="result-main-value">\u20B9{fmt(fromAnnual(reverseResult.netInHandAnnual))}</div>
+                  <div className="result-main-label">{period === "monthly" ? "Monthly" : "Annual"} Net In-Hand</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontFamily: "var(--font-display)", fontSize: "1.3rem", fontWeight: 700, color: "var(--success)" }}>
+                    \u20B9{fmt(fromAnnual(reverseResult.grossSalaryAnnual))}
+                  </div>
+                  <div className="result-main-label">Required Gross Salary</div>
+                </div>
+              </div>
+              {renderSalaryBreakup(reverseResult)}
+              <div className="result-grid" style={{ marginTop: "1rem" }}>
+                <div className="result-card" style={fixedCardStyle}>
+                  <span className="result-value text-danger" style={{ fontSize: "1.2rem" }}>\u20B9{fmt(fromAnnual(reverseResult.tax))}</span>
+                  <span className="result-label">Income Tax</span>
+                </div>
+                <div className="result-card" style={fixedCardStyle}>
+                  <span className="result-value">\u20B9{fmt(fromAnnual(reverseResult.employeePFAnnual))}</span>
+                  <span className="result-label">Employee PF</span>
+                </div>
+                <div className="result-card" style={fixedCardStyle}>
+                  <span className="result-value">{fmtPct(reverseResult.effectiveTaxRate)}</span>
+                  <span className="result-label">Effective Tax Rate</span>
+                </div>
+                <div className="result-card" style={fixedCardStyle}>
+                  <span className="result-value">{fmtPct(reverseResult.marginalTaxRate)}</span>
+                  <span className="result-label">Marginal Tax Rate</span>
+                </div>
+              </div>
+              {renderDonutChart(reverseResult)}
+              <p className="info-text" style={{ marginTop: "1rem" }}>
+                Required gross salary estimated via binary search (60 iterations). Accounts for PF, gratuity, professional tax and {regime === "new" ? "New" : "Old"} Regime income tax.
+              </p>
+              <div className="tool-actions">
+                <CopyBtn text={copyText} />
+                <button className="btn-tool btn-reset" onClick={handleReset}>&#x21BA; Reset</button>
+                <button className="btn-tool" onClick={handleDownloadPDF} disabled={!jsPDF}>&#x2B07; Download PDF</button>
+                <button className="btn-tool" onClick={handleShareResult}>&#x1F4E4; Share Result</button>
+              </div>
+            </>
+          )}
+        </>
+      )}
+
+      {offerComparisonMode && renderOfferComparisonForm()}
+    </section>
   );
 }

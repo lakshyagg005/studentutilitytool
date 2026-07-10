@@ -61,7 +61,7 @@ const POPULAR_TOOLS = [
     icon: "💰",
     name: "Salary Calculator",
     seoDesc:
-      "Estimate your monthly in-hand salary after income tax (New Regime FY 2024-25) and PF deductions. Essential for freshers evaluating their first job offer.",
+      "Estimate your monthly in-hand salary after income tax (New Regime FY 2025-26) and PF deductions. Essential for freshers evaluating their first job offer.",
   },
   {
     id: "pomodoro",

@@ -168,6 +168,8 @@ function calculateSalaryDetails({
 
   // Total CTC = Gross Salary + Employer PF + Gratuity + Variable Pay + Joining + Retention Bonuses
   const totalCTC = grossSalaryAnnual + employerPFAnnual + gratuityAnnual + variablePayAnnual + joiningBonusAnnual + retentionBonusAnnual;
+  // Fixed Annual Salary (excluding variable and one-time bonuses)
+  const fixedAnnualSalary = grossSalaryAnnual;
 
   // Taxable Income = Gross + Variable + Joining + Retention - Employee PF - Prof Tax (assuming these deductions)
   // For simplicity, we treat bonuses as one-time annual taxable income additions.
@@ -203,6 +205,7 @@ function calculateSalaryDetails({
     joiningBonusAnnual,
     retentionBonusAnnual,
     grossSalaryAnnual,
+    fixedAnnualSalary,
     totalCTC,
     taxableIncome,
     tax,
@@ -503,7 +506,7 @@ export default function SalaryCalc() {
     };
     return (
       <div style={{ marginTop: "1rem" }}>
-        <h3 style={{ marginBottom: "1rem" }}>Salary Breakup</h3>
+        <h3 style={{ marginBottom: "1rem" }}>Salary Breakdown</h3>
 
         {/* Earnings Section */}
         <div style={{ marginBottom: "1.5rem" }}>
@@ -512,6 +515,11 @@ export default function SalaryCalc() {
             <div className="result-card" style={greenBg}>
               <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.grossSalaryAnnual))}</span>
               <span className="result-label">Gross Salary</span>
+            </div>
+            <div className="result-card" style={greenBg}>
+              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.fixedAnnualSalary))}</span>
+              <span className="result-label">Fixed Salary</span>
+              <small style={{ color: "#666" }}>Excludes bonuses</small>
             </div>
             <div className="result-card" style={greenBg}>
               <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.basicAnnual))}</span>
@@ -588,11 +596,11 @@ export default function SalaryCalc() {
             </div>
             <div className="result-card" style={summaryBg}>
               <span style={{ fontSize: "1.35rem" }}>₹{fmt(fromAnnual(details.netInHandAnnual))}</span>
-              <span style={{ marginTop: "0.4rem" }}>Annual In-Hand</span>
+              <span style={{ marginTop: "0.4rem" }}>Annual In-Hand Salary (CTC Based)</span>
             </div>
             <div className="result-card" style={summaryBg}>
               <span style={{ fontSize: "1.35rem" }}>₹{fmt(fromAnnual(details.netInHandAnnual / 12))}</span>
-              <span style={{ marginTop: "0.4rem" }}>Monthly In-Hand</span>
+              <span style={{ marginTop: "0.4rem" }}>Monthly In-Hand Salary (CTC Based)</span>
             </div>
           </div>
         </div>
@@ -942,7 +950,7 @@ export default function SalaryCalc() {
               <div className="result-main" style={{ marginTop: "1rem" }}>
                 <div>
                   <div className="result-main-value">₹{fmt(fromAnnual(salaryDetails.netInHandAnnual))}</div>
-                  <div className="result-main-label">{period === "monthly" ? "Monthly In-Hand Salary" : "Annual In-Hand Salary"}</div>
+                  <div className="result-main-label">{period === "monthly" ? "Monthly In-Hand Salary (CTC Based)" : "Annual In-Hand Salary (CTC Based)"}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
                   <div style={{ fontFamily: "var(--font-display)", fontSize: "1.3rem", fontWeight: 700, color: "var(--success)" }}>
@@ -972,7 +980,7 @@ export default function SalaryCalc() {
               {renderDonutChart()}
 
               <p className="info-text" style={{ marginTop: "1rem" }}>
-                Based on {regime === "new" ? "New" : "Old"} Tax Regime. Includes 4% health & education cess. PF capped at ₹21,600/yr.
+                Based on {regime === "new" ? "New" : "Old"} Tax Regime. Includes 4% health & education cess. PF capped at ₹21,600/year. Total CTC includes Employer PF, Gratuity, Variable Pay, Joining Bonus and Retention Bonus. Monthly salary figures assume annual components are evenly distributed and may differ from actual employer payroll when bonuses are paid separately.
               </p>
 
               <div className="tool-actions">
@@ -1045,6 +1053,9 @@ export default function SalaryCalc() {
                       )}
                     </div>
                   </div>
+                  <p className="info-text" style={{ marginTop: "0.75rem" }}>
+                    Comparison assumes identical salary structure under both tax regimes. Actual employer payroll may vary depending on bonus payout timing.
+                  </p>
                 </div>
               )}
             </>
@@ -1098,7 +1109,7 @@ export default function SalaryCalc() {
           <div className="result-main" style={{ marginTop: "1rem" }}>
             <div>
               <div className="result-main-value">₹{fmt(fromAnnual(reverseResult.netInHandAnnual))}</div>
-              <div className="result-main-label">{period === "monthly" ? "Monthly Net In-Hand" : "Annual Net In-Hand"}</div>
+              <div className="result-main-label">{period === "monthly" ? "Monthly Net In-Hand Target" : "Annual Net In-Hand Target"}</div>
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontFamily: "var(--font-display)", fontSize: "1.3rem", fontWeight: 700, color: "var(--success)" }}>
@@ -1132,7 +1143,7 @@ export default function SalaryCalc() {
           {renderDonutChart()}
 
           <p className="info-text" style={{ marginTop: "1rem" }}>
-            Required gross salary estimated considering salary breakup, PF, gratuity, professional tax, and tax regime.
+            Required gross salary is estimated using iterative calculation including salary breakup, PF, gratuity, professional tax and the selected tax regime. Bonus payouts are assumed to be zero in reverse mode.
           </p>
 
           <div className="tool-actions">

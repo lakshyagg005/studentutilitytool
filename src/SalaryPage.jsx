@@ -10,7 +10,7 @@ const RELATED_IDS = ["attendance", "cgpa", "percentage", "internal", "emi", "loa
 
 const HOW_STEPS = [
   { n: "1", title: "Enter your annual CTC", body: "Type your Cost to Company in rupees as stated in your offer letter or appointment letter. CTC is the total amount your employer spends on you annually — it includes your gross salary plus employer contributions like PF and gratuity." },
-  { n: "2", title: "Read your monthly gross salary", body: "The calculator instantly shows your monthly gross — CTC divided by 12. This is what you earn before deductions. Note that this is not what gets credited to your bank account." },
+  { n: "2", title: "Read your monthly gross salary", body: "The calculator instantly estimates your monthly gross salary. If your package includes variable pay, joining bonus, or retention bonus, your actual monthly salary may be lower because these components are usually paid separately rather than every month." },
   { n: "3", title: "Check income tax and PF deductions", body: "The calculator applies New Tax Regime slabs (FY 2024-25) and caps PF at ₹21,600 per year. These are the two largest deductions for most salaried employees." },
   { n: "4", title: "See your monthly in-hand salary", body: "Your take-home salary appears after subtracting income tax and PF. This is the amount credited to your bank account each month." },
   { n: "5", title: "Compare annual in-hand vs CTC", body: "The difference between your annual CTC and annual in-hand is your total yearly deductions. This gap helps you budget accurately and evaluate whether a job offer meets your actual financial needs." },
@@ -73,17 +73,10 @@ export default function SalaryPage() {
       <section aria-label="About the Salary Calculator" style={{ ...sectionStyle, marginTop: "2rem" }}>
         <h2 style={h2Style}>Free Salary Calculator India — CTC to In-Hand Monthly Salary</h2>
         <p style={bodyStyle}>
-          When you receive a job offer, the number on the letter is your CTC — Cost to Company. This is not your
-          take-home salary. Between your CTC and the amount credited to your bank account every month lies a set of
-          deductions that most freshers and even experienced professionals underestimate. This salary calculator
-          bridges that gap by showing you exactly what you will actually earn.
+          CTC (Cost to Company) is the total annual cost your employer incurs for your employment, but it is not the amount credited to your bank account. This calculator estimates your in-hand salary by considering income tax, employee PF, and other applicable deductions, helping you understand your actual take-home pay in seconds.
         </p>
         <p style={{ ...bodyStyle, marginTop: "0.85rem" }}>
-          The calculator uses the New Tax Regime (FY 2024-25), which is now the default regime for salaried
-          employees in India. It deducts income tax based on the latest slab rates, applies a 4% health and
-          education cess, and caps PF at ₹21,600 per year in line with the EPF wage ceiling. The result is
-          your real monthly in-hand salary — the number that matters when you are deciding whether to accept
-          an offer, negotiate a hike, or plan your monthly budget.
+          The calculator supports the New Tax Regime (FY 2024–25), applies the latest slab rates, includes the 4% health and education cess, and considers the EPF contribution cap where applicable. Results are generated instantly to help you compare offers, negotiate salaries, and plan your finances with confidence.
         </p>
         <p style={{ ...bodyStyle, marginTop: "0.85rem" }}>
           Understanding your salary breakdown is more important than knowing your CTC. Two candidates with
@@ -118,8 +111,8 @@ export default function SalaryPage() {
       <section aria-label="Salary calculation formula" style={sectionStyle}>
         <h2 style={h2Style}>Salary Calculation Formula</h2>
         <p style={labelStyle}>Step 1 — Monthly and Annual Gross</p>
-        <code style={codeBlockStyle}>Monthly Gross = Annual CTC / 12</code>
-        <code style={codeBlockStyle}>Annual Gross = CTC (assumed full fixed package)</code>
+        <code style={codeBlockStyle}>Estimated Monthly Gross = Annual Fixed Salary / 12 (Bonuses and variable pay may be paid separately)</code>
+        <code style={codeBlockStyle}>Annual Fixed Salary = Fixed salary component only</code>
 
         <p style={{ ...labelStyle, marginTop: "1.25rem" }}>Step 2 — Income Tax (New Regime, FY 2024-25)</p>
         <code style={codeBlockStyle}>0%   → Income up to ₹3,00,000</code>
@@ -149,7 +142,7 @@ export default function SalaryPage() {
 
         <p style={labelStyle}>Input</p>
         <code style={codeBlockStyle}>Annual CTC = ₹12,00,000</code>
-        <code style={codeBlockStyle}>Monthly Gross = ₹12,00,000 / 12 = ₹1,00,000</code>
+        <code style={codeBlockStyle}>Estimated Monthly Gross = ₹12,00,000 / 12 = ₹1,00,000 (assuming no separate bonus payouts)</code>
 
         <p style={{ ...labelStyle, marginTop: "1rem" }}>Income Tax Calculation (New Regime)</p>
         <code style={codeBlockStyle}>0% on ₹3,00,000          = ₹0</code>

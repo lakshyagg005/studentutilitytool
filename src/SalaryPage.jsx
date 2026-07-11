@@ -1,4 +1,8 @@
-import { useState, useMemo } from "react";
+//old salarypage.jsx
+
+
+
+import { useState, useMemo, useEffect } from "react";
 import CopyBtn from "./CopyBtn";
 import { fmt } from "./helpers";
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from "recharts";
@@ -269,6 +273,249 @@ function fmtPct(val) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 export default function SalaryCalc() {
+  // ── SEO Metadata and Structured Data ──────────────────────────────────────
+  useEffect(() => {
+    // Title
+    document.title = "Salary Calculator India (FY 2025-26) | CTC to In-Hand Salary Calculator | Filtero";
+
+    // Meta description
+    const metaDescContent =
+      "Free Salary Calculator India for FY 2025-26. Calculate CTC to in-hand salary, salary breakup, EPF, HRA, professional tax, gratuity, and compare Old vs New Tax Regime instantly.";
+    let metaDesc = document.querySelector('meta[name="description"]');
+    if (!metaDesc) {
+      metaDesc = document.createElement("meta");
+      metaDesc.name = "description";
+      document.head.appendChild(metaDesc);
+    }
+    metaDesc.content = metaDescContent;
+
+    // Canonical link
+    const canonicalUrl = "https://tools.filtero.in/salary-calculator";
+    let canonicalLink = document.querySelector('link[rel="canonical"]');
+    if (!canonicalLink) {
+      canonicalLink = document.createElement("link");
+      canonicalLink.rel = "canonical";
+      document.head.appendChild(canonicalLink);
+    }
+    canonicalLink.href = canonicalUrl;
+
+    // Remove previous JSON-LD scripts by id
+    ["salary-faq-schema", "salary-breadcrumb-schema", "salary-webpage-schema"].forEach(id => {
+      const prev = document.getElementById(id);
+      if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+    });
+
+    // FAQPage schema (extracting questions from page)
+    const faqData = {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "What is the difference between CTC, gross salary, and in-hand salary?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "CTC is the total annual cost to the company and includes gross salary, employer PF, gratuity, and other benefits. Gross salary is the sum of all regular earnings before statutory deductions. In-hand salary (net salary) is the amount you actually receive after all deductions."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is HRA exemption calculated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Under the old regime, HRA exemption is the minimum of: (1) actual HRA received, (2) rent paid minus 10% of basic salary, (3) 50% of basic for metro cities or 40% for non-metro. In the new regime, HRA exemption is not available."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is included in CTC?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "CTC includes gross salary, variable pay, joining bonus, retention bonus, employer’s contribution to PF, gratuity, and sometimes other benefits (like insurance, ESOPs, etc.)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is employer PF part of in-hand salary?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. Employer PF is part of your CTC but not credited to your salary account. It is deposited in your PF account and can be withdrawn as per EPF rules."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does the new tax regime affect my salary?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The new regime offers lower tax rates and a higher standard deduction but removes most common exemptions (like HRA, 80C, 80D). It is beneficial for those who do not claim significant deductions."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I switch between old and new tax regimes every year?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, salaried employees can choose their preferred regime every financial year while filing their income tax return."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is professional tax and who pays it?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Professional tax is a small monthly tax levied by some state governments. The employer deducts it from your salary and deposits it with the state government. The amount varies by state and salary slab."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the EPF wage ceiling?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The statutory wage ceiling for EPF is ₹15,000/month. Both employer and employee contributions are calculated as 12% of basic salary, subject to this ceiling."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How is gratuity calculated?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Gratuity accrues at about 4.81% of your annual basic salary and is paid by the employer upon exit after at least 5 years of service. It is included in your CTC but not paid monthly."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Why is my in-hand salary much less than my CTC?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "CTC includes statutory employer contributions (PF, gratuity) and sometimes benefits not paid in cash. After deducting income tax, employee PF, and professional tax, your in-hand salary is much lower than CTC."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How can I maximize my in-hand salary?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "You can maximize your in-hand salary by optimizing your salary structure (higher basic for more PF, higher HRA for more exemption under old regime), claiming all eligible deductions, and choosing the most beneficial tax regime."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is variable pay included in CTC?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, variable pay (performance-linked bonus, incentives, etc.) is included in CTC but may not be paid every month. It is typically paid annually or quarterly based on performance."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How do I use a CTC to in hand salary calculator?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Enter your CTC details (gross, variable, bonuses, etc.), select your tax regime and state, and let the calculator compute your in-hand salary and detailed breakup instantly."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the standard deduction for FY 2025-26?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The standard deduction is ₹75,000 under the new regime (FY 2025-26) and ₹50,000 under the old regime."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can I claim both HRA and home loan interest?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, under the old regime, you can claim both HRA exemption (for rent paid) and deduction for home loan interest (Section 24b) if you meet the conditions."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is the Section 87A rebate?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Section 87A provides a rebate for individuals with taxable income up to ₹12 lakh (new regime) or ₹5 lakh (old regime), resulting in zero tax liability after rebate."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What is special allowance in salary?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Special allowance is the residual component of your gross salary after accounting for basic and HRA. It is fully taxable."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does the salary calculator handle state-specific professional tax?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "The calculator applies the correct professional tax slab based on the state you select, ensuring an accurate in-hand salary calculation."
+          }
+        }
+      ]
+    };
+
+    // BreadcrumbList schema
+    const breadcrumbData = {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://tools.filtero.in/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Salary Calculator",
+          "item": canonicalUrl
+        }
+      ]
+    };
+
+    // WebPage schema
+    const webpageData = {
+      "@context": "https://schema.org",
+      "@type": "WebPage",
+      "name": "Salary Calculator India (FY 2025-26) | CTC to In-Hand Salary Calculator | Filtero",
+      "description": metaDescContent,
+      "url": canonicalUrl,
+      "inLanguage": "en-IN",
+      "isPartOf": {
+        "@type": "WebSite",
+        "name": "Filtero Tools",
+        "url": "https://tools.filtero.in/"
+      },
+      "publisher": {
+        "@type": "Organization",
+        "name": "Filtero"
+      }
+    };
+
+    // Inject JSON-LD scripts
+    function injectSchema(id, data) {
+      const script = document.createElement("script");
+      script.type = "application/ld+json";
+      script.id = id;
+      script.textContent = JSON.stringify(data);
+      document.head.appendChild(script);
+    }
+    injectSchema("salary-faq-schema", faqData);
+    injectSchema("salary-breadcrumb-schema", breadcrumbData);
+    injectSchema("salary-webpage-schema", webpageData);
+
+    // Cleanup: remove injected scripts on unmount
+    return () => {
+      ["salary-faq-schema", "salary-breadcrumb-schema", "salary-webpage-schema"].forEach(id => {
+        const prev = document.getElementById(id);
+        if (prev && prev.parentNode) prev.parentNode.removeChild(prev);
+      });
+    };
+  }, []);
   // ── Existing input state (preserved) ──────────────────────────────────────
   const [grossSalaryInput,    setGrossSalaryInput]    = useState("");
   const [variablePayInput,    setVariablePayInput]    = useState("");
@@ -1036,6 +1283,392 @@ export default function SalaryCalc() {
       )}
 
       {offerComparisonMode && renderOfferComparisonForm()}
+
+      {/* ──────────────── SEO Content Block ──────────────── */}
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>What is a Salary Calculator?</h2>
+        <p>
+          A <strong>salary calculator India</strong> is an online tool designed to help employees, job seekers, and HR professionals calculate their <strong>in-hand salary</strong>, <strong>CTC breakup</strong>, and understand their <strong>salary structure</strong> as per the latest Indian tax laws (including <strong>FY 2025-26</strong>). It takes into account various components such as <strong>Gross Salary</strong>, <strong>CTC</strong>, <strong>Basic Salary</strong>, <strong>HRA</strong>, <strong>Special Allowance</strong>, <strong>EPF</strong>, <strong>Professional Tax</strong>, <strong>Gratuity</strong>, and <strong>Income Tax</strong> under both the <strong>Old and New Tax Regimes</strong>. With the <strong>CTC to in hand salary calculator</strong>, you can easily estimate your take-home pay, compare offers, and plan your finances more effectively.
+        </p>
+        <p>
+          This <strong>salary breakup calculator</strong> is tailored for Indian users and reflects the latest tax slabs, standard deductions, and statutory requirements. Whether you want to know your <strong>net salary</strong>, understand the impact of the <strong>old vs new tax regime</strong>, or simply break down your CTC, this tool provides a comprehensive and transparent calculation.
+        </p>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>How to Use This Salary Calculator</h2>
+        <ol>
+          <li>
+            <strong>Enter your Gross Salary</strong>: Input your annual or monthly gross salary as mentioned in your offer letter or payslip.
+          </li>
+          <li>
+            <strong>Add Variable Pay, Bonuses</strong>: Include any annual variable pay, joining bonus, or retention bonus if applicable.
+          </li>
+          <li>
+            <strong>Select Basic Salary Percentage</strong>: Adjust the basic salary percentage (usually 35–50% of gross) as per your company’s salary structure.
+          </li>
+          <li>
+            <strong>Choose Tax Regime</strong>: Select between the <strong>New Regime (FY 2025-26)</strong> or <strong>Old Regime</strong> to see which is more beneficial.
+          </li>
+          <li>
+            <strong>Configure HRA and Professional Tax</strong>: Choose your city type (Metro/Non-Metro) for HRA calculation and select your state for professional tax.
+          </li>
+          <li>
+            <strong>For Old Regime</strong>: Enter deductions (80C, 80D, Home Loan Interest, LTA, NPS) and actual rent paid for HRA exemption if applicable.
+          </li>
+          <li>
+            <strong>Review Results</strong>: The calculator will display your <strong>in-hand salary</strong>, <strong>total CTC</strong>, <strong>income tax</strong>, <strong>PF</strong>, <strong>professional tax</strong>, and a detailed <strong>salary breakup</strong>.
+          </li>
+          <li>
+            <strong>Compare Offers</strong>: Use the offer comparison mode to analyze two job offers side-by-side.
+          </li>
+          <li>
+            <strong>Reverse Calculation</strong>: Estimate the required gross salary for a desired in-hand amount.
+          </li>
+          <li>
+            <strong>Download or Share</strong>: Export your results as PDF or share them directly.
+          </li>
+        </ol>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>How Salary is Calculated</h2>
+        <p>
+          Your <strong>salary calculation</strong> in India involves various components and statutory deductions. The process starts with your <strong>Gross Salary</strong> and applies deductions such as <strong>Employee Provident Fund (EPF)</strong>, <strong>Professional Tax</strong>, and <strong>Income Tax</strong> (as per the selected regime). The result is your <strong>net in-hand salary</strong>.
+        </p>
+        <p>
+          The main formula is:
+        </p>
+        <pre style={{ background: "#f8f8f8", padding: "1rem", borderRadius: "8px", overflowX: "auto" }}>
+Net In-Hand Salary = Total Employee Income - Income Tax - Employee PF - Professional Tax
+        </pre>
+        <p>
+          <strong>Total CTC</strong> (Cost to Company) includes all earnings plus employer contributions (such as employer PF and gratuity):
+        </p>
+        <pre style={{ background: "#f8f8f8", padding: "1rem", borderRadius: "8px", overflowX: "auto" }}>
+Total CTC = Gross Fixed Salary + Variable Pay + Bonuses + Employer PF + Gratuity
+        </pre>
+        <p>
+          <strong>Income Tax</strong> is computed based on the applicable slabs, deductions, and tax regime.
+        </p>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>Salary Structure Explained</h2>
+        <p>
+          Understanding your <strong>salary structure</strong> is crucial for financial planning and maximizing your in-hand salary. Here’s a breakdown of the typical components:
+        </p>
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3>CTC (Cost to Company)</h3>
+          <p>
+            CTC is the total amount a company spends on an employee in a year. It includes <strong>gross salary</strong>, <strong>variable pay</strong>, <strong>bonuses</strong>, <strong>employer’s contribution to PF</strong>, <strong>gratuity</strong>, and sometimes other benefits. <br />
+            <em>CTC ≠ Take-home salary</em>; employer-side contributions are not received as cash in hand.
+          </p>
+        </section>
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3>Gross Salary</h3>
+          <p>
+            Gross salary is the sum of all regular earnings before deductions, excluding employer PF and gratuity. It typically includes <strong>Basic Salary</strong>, <strong>HRA</strong>, <strong>Special Allowance</strong>, and any other regular allowances.
+          </p>
+        </section>
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3>Basic Salary</h3>
+          <p>
+            Basic salary forms the core of your pay and is usually 35–50% of the gross salary. It is fully taxable and is used to compute other benefits like HRA and PF.
+          </p>
+        </section>
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3>HRA (House Rent Allowance)</h3>
+          <p>
+            HRA is paid to cover your housing expenses. The exemption for HRA under the old regime depends on your city (50% of basic for metros, 40% for non-metros) and actual rent paid. In the new regime, HRA exemption is not available.
+          </p>
+        </section>
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3>Special Allowance</h3>
+          <p>
+            Special allowance is the balancing component of your gross salary after accounting for basic and HRA. It is fully taxable.
+          </p>
+        </section>
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3>EPF (Employee Provident Fund)</h3>
+          <p>
+            Both you and your employer contribute 12% of your basic salary (subject to a statutory wage ceiling of ₹15,000/month) to EPF. Your contribution is deducted from your salary; the employer’s share is part of your CTC but not in-hand pay.
+          </p>
+        </section>
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3>Gratuity</h3>
+          <p>
+            Gratuity is a statutory benefit paid by the employer upon exit after at least 5 years of service. It accrues at about 4.81% of your annual basic salary and is included in CTC.
+          </p>
+        </section>
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3>Professional Tax</h3>
+          <p>
+            Professional tax is a small monthly deduction levied by some state governments. The amount depends on your state and gross monthly salary (e.g., ₹200/month in Karnataka for salaries above ₹15,000/month). It is fully deductible under both regimes.
+          </p>
+        </section>
+        <section style={{ marginTop: "1.5rem" }}>
+          <h3>Net Salary (In-Hand Salary)</h3>
+          <p>
+            This is the final amount credited to your bank account after all deductions. <strong>Net salary</strong> is what matters most for your monthly budgeting.
+          </p>
+        </section>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>Old vs New Tax Regime</h2>
+        <p>
+          The <strong>old vs new tax regime</strong> debate is crucial for Indian salaried employees. The <strong>Old Regime</strong> allows you to claim various deductions (HRA, 80C, 80D, etc.), while the <strong>New Regime</strong> offers lower tax rates but very limited deductions (only standard deduction and professional tax).
+        </p>
+        <ul>
+          <li>
+            <strong>Old Regime</strong>: Suitable for those who can claim substantial deductions (typically above ₹3.5 lakh/year). Allows exemptions for HRA, 80C (EPF, PPF, ELSS, LIC), 80D (medical insurance), home loan interest, LTA, and more.
+          </li>
+          <li>
+            <strong>New Regime (FY 2025-26)</strong>: Offers higher standard deduction (₹75,000) and zero tax for taxable income up to ₹12 lakh (Section 87A rebate). No HRA, 80C, or 80D deductions.
+          </li>
+        </ul>
+        <p>
+          Use this <strong>salary calculator India</strong> to compare your in-hand salary and tax liability under both regimes and choose the one that maximizes your take-home pay.
+        </p>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>CTC vs Gross Salary vs In-Hand Salary</h2>
+        <ul>
+          <li>
+            <strong>CTC (Cost to Company):</strong> The total annual cost incurred by your employer, including gross salary, employer PF, gratuity, and sometimes other benefits.
+          </li>
+          <li>
+            <strong>Gross Salary:</strong> The sum of all regular earnings before statutory deductions. Excludes employer PF and gratuity.
+          </li>
+          <li>
+            <strong>In-Hand Salary (Net Salary):</strong> The final amount you receive every month after deductions (income tax, employee PF, professional tax, etc.).
+          </li>
+        </ul>
+        <p>
+          <strong>CTC</strong> is always higher than <strong>Gross Salary</strong>, which in turn is higher than <strong>Net Salary</strong>. Many job seekers confuse CTC with take-home pay, leading to disappointment. Use this <strong>CTC to in hand salary calculator</strong> to avoid surprises!
+        </p>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>Salary Formula</h2>
+        <pre style={{ background: "#f8f8f8", padding: "1rem", borderRadius: "8px", overflowX: "auto" }}>
+// Total CTC
+Total CTC = Gross Salary + Variable Pay + Joining Bonus + Retention Bonus + Employer PF + Gratuity
+
+// Net In-Hand Salary
+Net In-Hand = Total Employee Income - Income Tax - Employee PF - Professional Tax
+
+// Basic Salary (as % of Gross)
+Basic Salary = Gross Salary × (Basic %)
+
+// HRA (House Rent Allowance)
+HRA = Basic Salary × (50% for Metro / 40% for Non-Metro)
+
+// Special Allowance (balancing figure)
+Special Allowance = Gross Salary - Basic Salary - HRA
+
+// Employer/Employee PF (subject to wage ceiling)
+EPF = 12% × min(Basic Salary, ₹15,000/month)
+
+// Gratuity (annual accrual)
+Gratuity = (Basic Salary / 26) × 15 × number of years (≈ 4.81% of annual basic)
+
+// Professional Tax (monthly, as per state slab)
+Professional Tax = As per state rules (e.g., ₹200/month in Karnataka for salaries above ₹15,000/month)
+
+// Income Tax
+Income Tax = As per slab (Old/New Regime), after deductions and standard deduction
+        </pre>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>Example Salary Calculation</h2>
+        <p>
+          Let’s walk through a realistic example using this <strong>salary breakup calculator</strong>:
+        </p>
+        <ul>
+          <li>Gross Salary: ₹10,00,000/year</li>
+          <li>Variable Pay: ₹1,00,000/year</li>
+          <li>Basic Salary Percentage: 40%</li>
+          <li>HRA: Metro city (50% of basic)</li>
+          <li>Professional Tax State: Karnataka</li>
+          <li>Tax Regime: New (FY 2025-26)</li>
+        </ul>
+        <p><strong>Step-by-Step Calculation:</strong></p>
+        <ol>
+          <li>
+            <strong>Basic Salary</strong> = ₹10,00,000 × 40% = ₹4,00,000
+          </li>
+          <li>
+            <strong>HRA</strong> = ₹4,00,000 × 50% = ₹2,00,000
+          </li>
+          <li>
+            <strong>Special Allowance</strong> = ₹10,00,000 - ₹4,00,000 - ₹2,00,000 = ₹4,00,000
+          </li>
+          <li>
+            <strong>Employer PF</strong> = 12% × min(₹4,00,000, ₹1,80,000) = ₹21,600
+          </li>
+          <li>
+            <strong>Employee PF</strong> = ₹21,600
+          </li>
+          <li>
+            <strong>Gratuity</strong> ≈ 4.81% × ₹4,00,000 = ₹19,240
+          </li>
+          <li>
+            <strong>Professional Tax</strong> = ₹200/month × 12 = ₹2,400
+          </li>
+          <li>
+            <strong>Total Employee Income</strong> = ₹10,00,000 + ₹1,00,000 = ₹11,00,000
+          </li>
+          <li>
+            <strong>Taxable Income (New Regime)</strong> = ₹11,00,000 - ₹2,400 (PT) - ₹75,000 (std deduction) = ₹10,22,600
+          </li>
+          <li>
+            <strong>Income Tax (as per slabs)</strong> = Calculated as per new regime slabs (see above)
+          </li>
+          <li>
+            <strong>Net In-Hand Salary</strong> = ₹11,00,000 - Income Tax - ₹21,600 (Employee PF) - ₹2,400 (PT)
+          </li>
+        </ol>
+        <p>
+          The calculator will perform all these calculations instantly and show your <strong>in-hand salary</strong>, <strong>total CTC</strong>, and a detailed breakup.
+        </p>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>Frequently Asked Questions</h2>
+        <details>
+          <summary>What is the difference between CTC, gross salary, and in-hand salary?</summary>
+          <p>
+            <strong>CTC</strong> is the total annual cost to the company and includes gross salary, employer PF, gratuity, and other benefits. <strong>Gross salary</strong> is the sum of all regular earnings before statutory deductions. <strong>In-hand salary</strong> (net salary) is the amount you actually receive after all deductions.
+          </p>
+        </details>
+        <details>
+          <summary>How is HRA exemption calculated?</summary>
+          <p>
+            Under the old regime, HRA exemption is the minimum of: (1) actual HRA received, (2) rent paid minus 10% of basic salary, (3) 50% of basic for metro cities or 40% for non-metro. In the new regime, HRA exemption is not available.
+          </p>
+        </details>
+        <details>
+          <summary>What is included in CTC?</summary>
+          <p>
+            CTC includes gross salary, variable pay, joining bonus, retention bonus, employer’s contribution to PF, gratuity, and sometimes other benefits (like insurance, ESOPs, etc.).
+          </p>
+        </details>
+        <details>
+          <summary>Is employer PF part of in-hand salary?</summary>
+          <p>
+            No. Employer PF is part of your CTC but not credited to your salary account. It is deposited in your PF account and can be withdrawn as per EPF rules.
+          </p>
+        </details>
+        <details>
+          <summary>How does the new tax regime affect my salary?</summary>
+          <p>
+            The new regime offers lower tax rates and a higher standard deduction but removes most common exemptions (like HRA, 80C, 80D). It is beneficial for those who do not claim significant deductions.
+          </p>
+        </details>
+        <details>
+          <summary>Can I switch between old and new tax regimes every year?</summary>
+          <p>
+            Yes, salaried employees can choose their preferred regime every financial year while filing their income tax return.
+          </p>
+        </details>
+        <details>
+          <summary>What is professional tax and who pays it?</summary>
+          <p>
+            Professional tax is a small monthly tax levied by some state governments. The employer deducts it from your salary and deposits it with the state government. The amount varies by state and salary slab.
+          </p>
+        </details>
+        <details>
+          <summary>What is the EPF wage ceiling?</summary>
+          <p>
+            The statutory wage ceiling for EPF is ₹15,000/month. Both employer and employee contributions are calculated as 12% of basic salary, subject to this ceiling.
+          </p>
+        </details>
+        <details>
+          <summary>How is gratuity calculated?</summary>
+          <p>
+            Gratuity accrues at about 4.81% of your annual basic salary and is paid by the employer upon exit after at least 5 years of service. It is included in your CTC but not paid monthly.
+          </p>
+        </details>
+        <details>
+          <summary>Why is my in-hand salary much less than my CTC?</summary>
+          <p>
+            CTC includes statutory employer contributions (PF, gratuity) and sometimes benefits not paid in cash. After deducting income tax, employee PF, and professional tax, your in-hand salary is much lower than CTC.
+          </p>
+        </details>
+        <details>
+          <summary>How can I maximize my in-hand salary?</summary>
+          <p>
+            You can maximize your in-hand salary by optimizing your salary structure (higher basic for more PF, higher HRA for more exemption under old regime), claiming all eligible deductions, and choosing the most beneficial tax regime.
+          </p>
+        </details>
+        <details>
+          <summary>Is variable pay included in CTC?</summary>
+          <p>
+            Yes, variable pay (performance-linked bonus, incentives, etc.) is included in CTC but may not be paid every month. It is typically paid annually or quarterly based on performance.
+          </p>
+        </details>
+        <details>
+          <summary>How do I use a CTC to in hand salary calculator?</summary>
+          <p>
+            Enter your CTC details (gross, variable, bonuses, etc.), select your tax regime and state, and let the calculator compute your in-hand salary and detailed breakup instantly.
+          </p>
+        </details>
+        <details>
+          <summary>What is the standard deduction for FY 2025-26?</summary>
+          <p>
+            The standard deduction is ₹75,000 under the new regime (FY 2025-26) and ₹50,000 under the old regime.
+          </p>
+        </details>
+        <details>
+          <summary>Can I claim both HRA and home loan interest?</summary>
+          <p>
+            Yes, under the old regime, you can claim both HRA exemption (for rent paid) and deduction for home loan interest (Section 24b) if you meet the conditions.
+          </p>
+        </details>
+        <details>
+          <summary>What is the Section 87A rebate?</summary>
+          <p>
+            Section 87A provides a rebate for individuals with taxable income up to ₹12 lakh (new regime) or ₹5 lakh (old regime), resulting in zero tax liability after rebate.
+          </p>
+        </details>
+        <details>
+          <summary>What is special allowance in salary?</summary>
+          <p>
+            Special allowance is the residual component of your gross salary after accounting for basic and HRA. It is fully taxable.
+          </p>
+        </details>
+        <details>
+          <summary>How does the salary calculator handle state-specific professional tax?</summary>
+          <p>
+            The calculator applies the correct professional tax slab based on the state you select, ensuring an accurate in-hand salary calculation.
+          </p>
+        </details>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>Disclaimer</h2>
+        <p>
+          This <strong>salary calculator India</strong> is for informational purposes only. While we strive for accuracy and update the tool for the latest tax rules (FY 2025-26), actual salary structures may vary by employer, and tax laws are subject to change. For official tax computation or financial advice, consult a qualified Chartered Accountant or HR professional. The tool does not store or share your data.
+        </p>
+      </section>
+
+      <section style={{ marginTop: "2.5rem" }}>
+        <h2>Related Calculators</h2>
+        <ul>
+          <li><a href="/attendance">Attendance Calculator</a></li>
+          <li><a href="/cgpa">CGPA Calculator</a></li>
+          <li><a href="/internal-marks">Internal Marks Calculator</a></li>
+          <li><a href="/percentage">Percentage Calculator</a></li>
+          <li><a href="/emi">EMI Calculator</a></li>
+          <li><a href="/loan">Loan Calculator</a></li>
+          <li><a href="/age">Age Calculator</a></li>
+          <li><a href="/unit-converter">Unit Converter</a></li>
+        </ul>
+      </section>
     </section>
   );
 }

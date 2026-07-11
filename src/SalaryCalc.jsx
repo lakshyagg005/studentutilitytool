@@ -220,6 +220,17 @@ function fmtPct(val) {
   return (val * 100).toFixed(2) + "%";
 }
 
+// Helper to format compact currency (e.g. ₹8.14L for 814000)
+function fmtCompactCurrency(val) {
+  const num = Number(val) || 0;
+
+  if (Math.abs(num) >= 100000) {
+    return `₹${(num / 100000).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1")}L`;
+  }
+
+  return `₹${fmt(num)}`;
+}
+
 export default function SalaryCalc() {
   // Input states
   const [grossSalaryInput, setGrossSalaryInput] = useState("");
@@ -591,15 +602,39 @@ export default function SalaryCalc() {
           <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "1.1rem" }}>💰 Final Summary</div>
           <div className="result-grid">
             <div className="result-card" style={summaryBg}>
-              <span style={{ fontSize: "1.35rem" }}>₹{fmt(fromAnnual(details.totalCTC))}</span>
+              <span
+                style={{
+                  fontSize: "clamp(1.1rem, 5vw, 1.35rem)",
+                  lineHeight: 1.15,
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  textAlign: "center",
+                }}
+              >{fmtCompactCurrency(fromAnnual(details.totalCTC))}</span>
               <span style={{ marginTop: "0.4rem" }}>Total CTC</span>
             </div>
             <div className="result-card" style={summaryBg}>
-              <span style={{ fontSize: "1.35rem" }}>₹{fmt(fromAnnual(details.netInHandAnnual))}</span>
+              <span
+                style={{
+                  fontSize: "clamp(1.1rem, 5vw, 1.35rem)",
+                  lineHeight: 1.15,
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  textAlign: "center",
+                }}
+              >{fmtCompactCurrency(fromAnnual(details.netInHandAnnual))}</span>
               <span style={{ marginTop: "0.4rem" }}>Annual In-Hand Salary (CTC Based)</span>
             </div>
             <div className="result-card" style={summaryBg}>
-              <span style={{ fontSize: "1.35rem" }}>₹{fmt(fromAnnual(details.netInHandAnnual / 12))}</span>
+              <span
+                style={{
+                  fontSize: "clamp(1.1rem, 5vw, 1.35rem)",
+                  lineHeight: 1.15,
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  textAlign: "center",
+                }}
+              >{fmtCompactCurrency(fromAnnual(details.netInHandAnnual / 12))}</span>
               <span style={{ marginTop: "0.4rem" }}>Monthly In-Hand Salary (CTC Based)</span>
             </div>
           </div>
@@ -949,11 +984,32 @@ export default function SalaryCalc() {
             <>
               <div className="result-main" style={{ marginTop: "1rem" }}>
                 <div>
-                  <div className="result-main-value">₹{fmt(fromAnnual(salaryDetails.netInHandAnnual))}</div>
-                  <div className="result-main-label">{period === "monthly" ? "Monthly In-Hand Salary (CTC Based)" : "Annual In-Hand Salary (CTC Based)"}</div>
+              <div
+                className="result-main-value"
+                style={{
+                  fontSize: "clamp(1.8rem, 7vw, 3rem)",
+                  lineHeight: 1.1,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+              >
+                ₹{fmt(fromAnnual(salaryDetails.netInHandAnnual))}
+              </div>
+              <div className="result-main-label">{period === "monthly" ? "Monthly In-Hand Salary (CTC Based)" : "Annual In-Hand Salary (CTC Based)"}</div>
                 </div>
                 <div style={{ textAlign: "right" }}>
-                  <div style={{ fontFamily: "var(--font-display)", fontSize: "1.3rem", fontWeight: 700, color: "var(--success)" }}>
+                  <div
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      fontSize: "clamp(1.1rem, 5vw, 1.3rem)",
+                      fontWeight: 700,
+                      color: "var(--success)",
+                      lineHeight: 1.1,
+                      overflowWrap: "anywhere",
+                      wordBreak: "break-word",
+                      textAlign: "right",
+                    }}
+                  >
                     ₹{fmt(fromAnnual(salaryDetails.totalCTC))}
                   </div>
                   <div className="result-main-label">Total CTC</div>
@@ -1108,11 +1164,32 @@ export default function SalaryCalc() {
         <>
           <div className="result-main" style={{ marginTop: "1rem" }}>
             <div>
-              <div className="result-main-value">₹{fmt(fromAnnual(reverseResult.netInHandAnnual))}</div>
+              <div
+                className="result-main-value"
+                style={{
+                  fontSize: "clamp(1.8rem, 7vw, 3rem)",
+                  lineHeight: 1.1,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                }}
+              >
+                ₹{fmt(fromAnnual(reverseResult.netInHandAnnual))}
+              </div>
               <div className="result-main-label">{period === "monthly" ? "Monthly Net In-Hand Target" : "Annual Net In-Hand Target"}</div>
             </div>
             <div style={{ textAlign: "right" }}>
-              <div style={{ fontFamily: "var(--font-display)", fontSize: "1.3rem", fontWeight: 700, color: "var(--success)" }}>
+              <div
+                style={{
+                  fontFamily: "var(--font-display)",
+                  fontSize: "clamp(1.1rem, 5vw, 1.3rem)",
+                  fontWeight: 700,
+                  color: "var(--success)",
+                  lineHeight: 1.1,
+                  overflowWrap: "anywhere",
+                  wordBreak: "break-word",
+                  textAlign: "right",
+                }}
+              >
                 ₹{fmt(fromAnnual(reverseResult.grossSalaryAnnual))}
               </div>
               <div className="result-main-label">Required Gross Salary</div>

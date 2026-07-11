@@ -223,11 +223,24 @@ function fmtPct(val) {
 // Helper to format compact currency (e.g. ₹8.14L for 814000)
 function fmtCompactCurrency(val) {
   const num = Number(val) || 0;
-
-  if (Math.abs(num) >= 100000) {
-    return `₹${(num / 100000).toFixed(2).replace(/\.00$/, "").replace(/(\.\d)0$/, "$1")}L`;
+  const abs = Math.abs(num);
+  if (abs >= 10000000) {
+    return `₹${(num / 10000000)
+      .toFixed(2)
+      .replace(/\.00$/, "")
+      .replace(/(\.\d)0$/, "$1")} Cr`;
   }
-
+  if (abs >= 100000) {
+    return `₹${(num / 100000)
+      .toFixed(2)
+      .replace(/\.00$/, "")
+      .replace(/(\.\d)0$/, "$1")}L`;
+  }
+  if (abs >= 1000) {
+    return `₹${(num / 1000)
+      .toFixed(1)
+      .replace(/\.0$/, "")}K`;
+  }
   return `₹${fmt(num)}`;
 }
 
@@ -951,18 +964,18 @@ export default function SalaryCalc() {
           <div className="result-grid" style={{ marginTop: "1rem" }}>
             <div className="result-card" style={{ minHeight: "40px" }}>
               <strong>Net In-hand</strong>
-              <div>₹{fmt(fromAnnual(offer1Details.netInHandAnnual))}</div>
-              <div>₹{fmt(fromAnnual(offer2Details.netInHandAnnual))}</div>
+              <div>{fmtCompactCurrency(fromAnnual(offer1Details.netInHandAnnual))}</div>
+              <div>{fmtCompactCurrency(fromAnnual(offer2Details.netInHandAnnual))}</div>
             </div>
             <div className="result-card" style={{ minHeight: "40px" }}>
               <strong>Total Tax</strong>
-              <div>₹{fmt(fromAnnual(offer1Details.tax))}</div>
-              <div>₹{fmt(fromAnnual(offer2Details.tax))}</div>
+              <div>{fmtCompactCurrency(fromAnnual(offer1Details.tax))}</div>
+              <div>{fmtCompactCurrency(fromAnnual(offer2Details.tax))}</div>
             </div>
             <div className="result-card" style={{ minHeight: "40px" }}>
               <strong>Total CTC</strong>
-              <div>₹{fmt(fromAnnual(offer1Details.totalCTC))}</div>
-              <div>₹{fmt(fromAnnual(offer2Details.totalCTC))}</div>
+              <div>{fmtCompactCurrency(fromAnnual(offer1Details.totalCTC))}</div>
+              <div>{fmtCompactCurrency(fromAnnual(offer2Details.totalCTC))}</div>
             </div>
           </div>
         )}
@@ -1100,7 +1113,7 @@ export default function SalaryCalc() {
                   wordBreak: "break-word",
                 }}
               >
-                ₹{fmt(fromAnnual(salaryDetails.netInHandAnnual))}
+                {fmtCompactCurrency(fromAnnual(salaryDetails.netInHandAnnual))}
               </div>
               <div className="result-main-label">{period === "monthly" ? "Monthly In-Hand Salary (CTC Based)" : "Annual In-Hand Salary (CTC Based)"}</div>
                 </div>
@@ -1117,7 +1130,7 @@ export default function SalaryCalc() {
                       textAlign: "right",
                     }}
                   >
-                    ₹{fmt(fromAnnual(salaryDetails.totalCTC))}
+                    {fmtCompactCurrency(fromAnnual(salaryDetails.totalCTC))}
                   </div>
                   <div className="result-main-label">Total CTC</div>
                 </div>
@@ -1127,7 +1140,7 @@ export default function SalaryCalc() {
 
               <div className="result-grid" style={{ marginTop: "1rem" }}>
                 <div className="result-card" style={fixedCardStyle}>
-                  <span className="result-value text-danger" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(salaryDetails.tax))}</span>
+                  <span className="result-value text-danger" style={{ fontSize: "1.2rem" }}>{fmtCompactCurrency(fromAnnual(salaryDetails.tax))}</span>
                   <span className="result-label">Income Tax</span>
                 </div>
                 <div className="result-card" style={fixedCardStyle}>
@@ -1168,7 +1181,7 @@ export default function SalaryCalc() {
                           marginTop: "8px",
                         }}
                       >
-                        ₹{fmt(fromAnnual(comparisonDetails.oldRegimeDetails.tax))}
+                        {fmtCompactCurrency(fromAnnual(comparisonDetails.oldRegimeDetails.tax))}
                       </div>
                     </div>
 
@@ -1181,7 +1194,7 @@ export default function SalaryCalc() {
                           marginTop: "8px",
                         }}
                       >
-                        ₹{fmt(fromAnnual(comparisonDetails.newRegimeDetails.tax))}
+                        {fmtCompactCurrency(fromAnnual(comparisonDetails.newRegimeDetails.tax))}
                       </div>
                     </div>
                   </div>
@@ -1203,12 +1216,12 @@ export default function SalaryCalc() {
                     >
                       {comparisonDetails.taxDiff > 0 ? (
                         <>
-                          ✅ Save ₹{fmt(fromAnnual(comparisonDetails.savings))} with
+                          ✅ Save {fmtCompactCurrency(fromAnnual(comparisonDetails.savings))} with
                           <strong> New Regime</strong>
                         </>
                       ) : comparisonDetails.taxDiff < 0 ? (
                         <>
-                          ✅ Save ₹{fmt(fromAnnual(comparisonDetails.savings))} with
+                          ✅ Save {fmtCompactCurrency(fromAnnual(comparisonDetails.savings))} with
                           <strong> Old Regime</strong>
                         </>
                       ) : (
@@ -1280,7 +1293,7 @@ export default function SalaryCalc() {
                   wordBreak: "break-word",
                 }}
               >
-                ₹{fmt(fromAnnual(reverseResult.netInHandAnnual))}
+                {fmtCompactCurrency(fromAnnual(reverseResult.netInHandAnnual))}
               </div>
               <div className="result-main-label">{period === "monthly" ? "Monthly Net In-Hand Target" : "Annual Net In-Hand Target"}</div>
             </div>
@@ -1297,7 +1310,7 @@ export default function SalaryCalc() {
                   textAlign: "right",
                 }}
               >
-                ₹{fmt(fromAnnual(reverseResult.grossSalaryAnnual))}
+                {fmtCompactCurrency(fromAnnual(reverseResult.grossSalaryAnnual))}
               </div>
               <div className="result-main-label">Required Gross Salary</div>
             </div>
@@ -1307,11 +1320,11 @@ export default function SalaryCalc() {
 
           <div className="result-grid" style={{ marginTop: "1rem" }}>
             <div className="result-card" style={fixedCardStyle}>
-              <span className="result-value text-danger" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(reverseResult.tax))}</span>
+              <span className="result-value text-danger" style={{ fontSize: "1.2rem" }}>{fmtCompactCurrency(fromAnnual(reverseResult.tax))}</span>
               <span className="result-label">Income Tax</span>
             </div>
             <div className="result-card" style={fixedCardStyle}>
-              <span className="result-value">₹{fmt(fromAnnual(reverseResult.employeePFAnnual))}</span>
+              <span className="result-value">{fmtCompactCurrency(fromAnnual(reverseResult.employeePFAnnual))}</span>
               <span className="result-label">Employee PF</span>
             </div>
             <div className="result-card" style={fixedCardStyle}>

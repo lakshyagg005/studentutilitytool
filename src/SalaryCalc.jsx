@@ -498,9 +498,33 @@ export default function SalaryCalc() {
   function renderSalaryBreakup(details) {
     if (!details) return null;
     // Card styles
-    const greenBg = { background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)", ...fixedCardStyle };
-    const blueBg = { background: "rgba(33,150,243,0.08)", border: "1px solid rgba(33,150,243,0.15)", ...fixedCardStyle };
-    const redBg = { background: "rgba(244,67,54,0.08)", border: "1px solid rgba(244,67,54,0.15)", ...fixedCardStyle };
+    const greenBg = {
+      background: "rgba(34,197,94,0.08)",
+      border: "1px solid rgba(34,197,94,0.15)",
+      width: "100%",
+      minWidth: 0,
+      boxSizing: "border-box",
+      overflow: "hidden",
+      ...fixedCardStyle,
+    };
+    const blueBg = {
+      background: "rgba(33,150,243,0.08)",
+      border: "1px solid rgba(33,150,243,0.15)",
+      width: "100%",
+      minWidth: 0,
+      boxSizing: "border-box",
+      overflow: "hidden",
+      ...fixedCardStyle,
+    };
+    const redBg = {
+      background: "rgba(244,67,54,0.08)",
+      border: "1px solid rgba(244,67,54,0.15)",
+      width: "100%",
+      minWidth: 0,
+      boxSizing: "border-box",
+      overflow: "hidden",
+      ...fixedCardStyle,
+    };
     const summaryBg = {
       background: "linear-gradient(90deg, #166534 80%, #22c55e 100%)",
       color: "#fff",
@@ -513,6 +537,11 @@ export default function SalaryCalc() {
       flexDirection: "column",
       alignItems: "center",
       justifyContent: "center",
+      width: "100%",
+      minWidth: 0,
+      padding: "14px",
+      boxSizing: "border-box",
+      overflow: "hidden",
       ...fixedCardStyle,
     };
     return (
@@ -524,38 +553,86 @@ export default function SalaryCalc() {
           <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "1.1rem" }}>💼 Earnings</div>
           <div className="result-grid">
             <div className="result-card" style={greenBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.grossSalaryAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.grossSalaryAnnual))}</span>
               <span className="result-label">Gross Salary</span>
             </div>
             <div className="result-card" style={greenBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.fixedAnnualSalary))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.fixedAnnualSalary))}</span>
               <span className="result-label">Fixed Salary</span>
               <small style={{ color: "#666" }}>Excludes bonuses</small>
             </div>
             <div className="result-card" style={greenBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.basicAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.basicAnnual))}</span>
               <span className="result-label">Basic Salary</span>
               <small style={{ color: "#666" }}>40% of Gross</small>
             </div>
             <div className="result-card" style={greenBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.hraAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.hraAnnual))}</span>
               <span className="result-label">House Rent Allowance</span>
               <small style={{ color: "#666" }}>50% of Basic</small>
             </div>
             <div className="result-card" style={greenBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.specialAllowanceAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.specialAllowanceAnnual))}</span>
               <span className="result-label">Special Allowance</span>
             </div>
             <div className="result-card" style={greenBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.variablePayAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.variablePayAnnual))}</span>
               <span className="result-label">Variable Pay</span>
             </div>
             <div className="result-card" style={greenBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.joiningBonusAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.joiningBonusAnnual))}</span>
               <span className="result-label">Joining Bonus</span>
             </div>
             <div className="result-card" style={greenBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.retentionBonusAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.retentionBonusAnnual))}</span>
               <span className="result-label">Retention Bonus</span>
             </div>
           </div>
@@ -566,12 +643,24 @@ export default function SalaryCalc() {
           <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "1.1rem" }}>🧾 Employer Contributions</div>
           <div className="result-grid">
             <div className="result-card" style={blueBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.employerPFAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.employerPFAnnual))}</span>
               <span className="result-label">Employer PF</span>
               <small style={{ color: "#666" }}>Estimated (EPF wage ceiling applied)</small>
             </div>
             <div className="result-card" style={blueBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.gratuityAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.gratuityAnnual))}</span>
               <span className="result-label">Gratuity</span>
               <small style={{ color: "#666" }}>4.81% of Basic</small>
             </div>
@@ -583,15 +672,33 @@ export default function SalaryCalc() {
           <div style={{ fontWeight: 600, marginBottom: "0.5rem", fontSize: "1.1rem" }}>➖ Deductions</div>
           <div className="result-grid">
             <div className="result-card" style={redBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.employeePFAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.employeePFAnnual))}</span>
               <span className="result-label">Employee PF</span>
             </div>
             <div className="result-card" style={redBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.profTaxAnnual))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.profTaxAnnual))}</span>
               <span className="result-label">Professional Tax</span>
             </div>
             <div className="result-card" style={redBg}>
-              <span className="result-value" style={{ fontSize: "1.2rem" }}>₹{fmt(fromAnnual(details.tax))}</span>
+              <span className="result-value" style={{
+                fontSize: "clamp(1rem, 4.5vw, 1.2rem)",
+                lineHeight: 1.1,
+                overflowWrap: "anywhere",
+                wordBreak: "break-word",
+                textAlign: "center",
+              }}>{fmtCompactCurrency(fromAnnual(details.tax))}</span>
               <span className="result-label">Income Tax</span>
             </div>
           </div>

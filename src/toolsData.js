@@ -12,7 +12,7 @@ export const TOOLS = [
       title: "Attendance Calculator – Check Bunk Limit & 75% Status | Filtero",
       description:
         "Free online attendance calculator for students. Find your attendance percentage, how many classes you can bunk, and how many you need to reach 75%. Instant results.",
-      canonical: "https://filtero.app/attendance-calculator",
+      canonical: "https://tools.filterero.in/attendance-calculator",
     },
     faqs: [
       {
@@ -46,7 +46,7 @@ export const TOOLS = [
       title: "CGPA Calculator – Weighted GPA & Percentage Converter | Filtero",
       description:
         "Calculate your CGPA online with subject-wise grade and credit inputs. Instantly get your weighted GPA and equivalent percentage. Free student tool.",
-      canonical: "https://filtero.app/cgpa-calculator",
+      canonical: "https://tools.filterero.in/cgpa-calculator",
     },
     faqs: [
       {
@@ -80,7 +80,7 @@ export const TOOLS = [
       title: "Percentage Calculator – Marks to Percentage Converter | Filtero",
       description:
         "Convert obtained marks to percentage instantly. Free online percentage calculator for students with pass/fail status. Enter your marks and total to get your result.",
-      canonical: "https://filtero.app/percentage-calculator",
+      canonical: "https://tools.filterero.in/percentage-calculator",
     },
     faqs: [
       {
@@ -114,7 +114,7 @@ export const TOOLS = [
       title: "Internal Marks Calculator – Predict Your Internal Score | Filtero",
       description:
         "Calculate your predicted internal marks from assignments, attendance marks, and practical scores. Instant internal score estimator for college students.",
-      canonical: "https://filtero.app/internal-marks-calculator",
+      canonical: "https://tools.filterero.in/internal-marks-calculator",
     },
     faqs: [
       {
@@ -148,7 +148,7 @@ export const TOOLS = [
       title: "Board Result Predictor – Estimate Your Final Exam Score | Filtero",
       description:
         "Predict your board exam result using mock test scores and internal marks. Free online board result estimator for Class 10, Class 12 and college students.",
-      canonical: "https://filtero.app/board-result-predictor",
+      canonical: "https://tools.filterero.in/board-result-predictor",
     },
     faqs: [
       {
@@ -182,7 +182,7 @@ export const TOOLS = [
       title: "EMI Calculator – Monthly Loan Instalment Calculator | Filtero",
       description:
         "Calculate your EMI (Equated Monthly Instalment) instantly. Enter loan amount, interest rate, and tenure to get monthly EMI, total interest, and total payment.",
-      canonical: "https://filtero.app/emi-calculator",
+      canonical: "https://tools.filterero.in/emi-calculator",
     },
     faqs: [
       {
@@ -216,7 +216,7 @@ export const TOOLS = [
       title: "Salary Calculator India – In-Hand Salary After Tax | Filtero",
       description:
         "Calculate your monthly in-hand salary after income tax (New Tax Regime FY 2025-26), PF deduction, and cess. Free Indian salary take-home calculator.",
-      canonical: "https://filtero.app/salary-calculator",
+      canonical: "https://tools.filterero.in/salary-calculator",
     },
     faqs: [
       {
@@ -250,7 +250,7 @@ export const TOOLS = [
       title: "Loan Calculator – Simple & Compound Interest Repayment | Filtero",
       description:
         "Calculate total loan repayment with both simple and compound interest. Enter principal, interest rate, and duration to instantly see your repayment amount.",
-      canonical: "https://filtero.app/loan-calculator",
+      canonical: "https://tools.filterero.in/loan-calculator",
     },
     faqs: [
       {
@@ -284,7 +284,7 @@ export const TOOLS = [
       title: "Word Counter – Live Word, Character & Reading Time Counter | Filtero",
       description:
         "Free online word counter for students and writers. Get instant word count, character count, sentence count, paragraph count, and estimated reading time.",
-      canonical: "https://filtero.app/word-counter",
+      canonical: "https://tools.filterero.in/word-counter",
     },
     faqs: [
       {
@@ -318,7 +318,7 @@ export const TOOLS = [
       title: "Study Timer – Online Stopwatch for Students | Filtero",
       description:
         "Free online study timer and stopwatch for students. Track your study sessions with a clean, distraction-free interface. Start, pause, and reset with one click.",
-      canonical: "https://filtero.app/study-timer",
+      canonical: "https://tools.filterero.in/study-timer",
     },
     faqs: [
       {
@@ -352,7 +352,7 @@ export const TOOLS = [
       title: "Pomodoro Timer – 25-Minute Focus Timer for Students | Filtero",
       description:
         "Free online Pomodoro timer for students. Work in 25-minute focus sessions with 5-minute breaks. Includes session tracking and long break reminders.",
-      canonical: "https://filtero.app/pomodoro",
+      canonical: "https://tools.filterero.in/pomodoro",
     },
     faqs: [
       {
@@ -386,7 +386,7 @@ export const TOOLS = [
       title: "Unit Converter – Length, Weight & Temperature | Filtero",
       description:
         "Free online unit converter for students. Convert length (meters, miles, feet), weight (kg, pounds, grams), and temperature (Celsius, Fahrenheit, Kelvin) instantly.",
-      canonical: "https://filtero.app/unit-converter",
+      canonical: "https://tools.filterero.in/unit-converter",
     },
     faqs: [
       {
@@ -420,7 +420,7 @@ export const TOOLS = [
       title: "Age Calculator – Find Your Exact Age in Years, Months & Days | Filtero",
       description:
         "Free online age calculator. Enter your date of birth to instantly find your exact age in years, months, and days, plus how many days until your next birthday.",
-      canonical: "https://filtero.app/age-calculator",
+      canonical: "https://tools.filterero.in/age-calculator",
     },
     faqs: [
       {

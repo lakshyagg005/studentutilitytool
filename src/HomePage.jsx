@@ -9,7 +9,7 @@ const HOME_SEO = {
   title: "Filtero – Free Student Utility Tools | Attendance, CGPA, EMI & More",
   description:
     "Filtero is a free student utility platform with 13 instant-use tools: attendance calculator, CGPA calculator, EMI calculator, salary calculator, pomodoro timer, word counter, and more. No sign-up required.",
-  canonical: "https://tools.filterero.in/",
+  canonical: "https://tools.filtero.in/",
 };
 
 const WHY_CARDS = [
@@ -148,7 +148,7 @@ export default function HomePage() {
         {/* ─── HERO ─── */}
         <section className="hero" aria-label="Hero" itemScope itemType="https://schema.org/WebSite">
           <meta itemProp="name" content="Filtero" />
-          <meta itemProp="url" content="https://tools.filterero.in" />
+          <meta itemProp="url" content="https://tools.filtero.in" />
           <div className="hero-badge">
             <span>⚡</span> Free Student Utility Platform
           </div>
